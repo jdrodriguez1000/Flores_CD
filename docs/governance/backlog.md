@@ -5,7 +5,7 @@ Este documento es la única fuente de verdad para la orquestación del proyecto.
 ## 📊 Estado Global
 - **Fase Actual:** Phase Discovery
 - **Iteración Actual:** Iteración 0.0 (Setup y Gobernanza)
-- **Progreso de Iteración:** 40%
+- **Progreso de Iteración:** 58% (7/12 tareas completadas)
 
 ---
 
@@ -37,8 +37,8 @@ Este documento es la única fuente de verdad para la orquestación del proyecto.
 | **T0.2** | Configuración de Git Flow y Ramas Base | `ai-repository-governor` | 🟢 **Completada** | Ramas `main` y `dev` sincronizadas en GitHub. |
 | **T0.3** | Creación y Estructuración del Backlog | `ai-backlog-manager` | 🟢 **Completada** | `backlog.md` actualizado con tareas de la Iteración 0. |
 | **T0.4** | Protocolo Ask-Me: Entendimiento Compartido | `ai-business-strategist` | 🟢 **Completada** | `shared_understanding.md` completado y firmado. |
-| **T0.5** | Configuración de Identidad del Proyecto | `config-manager` | ⚪ **No iniciada** | `config.md` con IDs y metadatos oficiales. |
-| **T0.6** | Redacción del BRD (Requerimientos) | `ai-business-strategist` | ⚪ **No iniciada** | `BRD.md` aprobado con KPIs y objetivos claros. |
+| **T0.5** | Configuración de Identidad del Proyecto | `config-manager` | 🟢 **Completada** | `config.md` con IDs y metadatos oficiales. |
+| **T0.6** | Redacción del BRD (Requerimientos) | `ai-business-strategist` | 🟢 **Completada** | `docs/governance/BRD.md` v1.1.0 aprobado. 7 RF, 5 RNF, 3 US, 6 CA, KPIs con thresholds y baseline medible. CC-001 aplicado. |
 | **T0.7** | Definición de Contrato Behavior (BDD) | `ai-business-strategist` | ⚪ **No iniciada** | `behavior.md` con escenarios Gherkin Given/When/Then. |
 | **T0.8** | Reporte de Factibilidad de Datos | `ai-data-auditor` | ⚪ **No iniciada** | `feasibility.md` con inventario y análisis de gaps de datos. |
 | **T0.9** | Construcción del Mockup Visual (Prototipo) | `ai-ux-designer` | ⚪ **No iniciada** | `mockup/index.html` funcional (smoke & mirrors) + `mockup.md`. |
