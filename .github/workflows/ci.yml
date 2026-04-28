@@ -1,0 +1,40 @@
+name: Verificación y CI (Integración Continua)
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  validate:
+    name: Validar Código y Calidad
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Listar archivos para depuración
+        run: ls -R
+
+      - name: Revisión de Estilo (Ruff)
+        run: ruff check . --select E,F,W --exclude .git
+
+      - name: Ejecutar Tests Unitarios (Pytest)
+        run: pytest tests/ -v
