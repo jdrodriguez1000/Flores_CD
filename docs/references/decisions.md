@@ -90,3 +90,34 @@
 | :--- | :--- | :--- |
 | **L-005** | Una auditoria devil's advocate del BRD antes de avanzar a T0.7 (BDD) previene que los escenarios Gherkin hereden vacios logicos. El costo de corregir en el BRD es minimo; el costo de corregir en behavior.md + tests es mayor. | La contradiccion CC-001 hubiera generado un RF inimplementable que solo se habria detectado al escribir el escenario Gherkin de US-02/US-03. |
 | **L-006** | Los criterios de aceptacion (CA) deben tener valores concretos desde el BRD. Un CA sin inputs numericos especificos no es un test — es una intencion. | CA-02 original decia "valores ambiguos en zona de frontera" sin especificarlos, haciendo el UAT no determinista. |
+
+---
+
+## [2026-04-28] — Auditoria Devil's Advocate BRD Rondas 1 y 2 (v1.1.0 → v1.3.0)
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente de cierre:** `ai-session-steward`
+- **Tareas completadas en sesion:** Auditoria del BRD en 2 rondas iterativas → BRD v1.3.0 Aprobado
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-006** | Despliegue: una unica instancia Streamlit en PC compartida con acceso secuencial de 5 analistas | El cliente no tiene infraestructura de servidores. La concurrencia real es baja (5 analistas, acceso secuencial). Streamlit local es la solucion minima que evita complejidad de redes o autenticacion. | El SAD (T0.10) no debe disenar para concurrencia alta. La arquitectura es single-instance por decision de negocio. |
+| **D-007** | Persistencia: SQLite como unico mecanismo de escritura; CSV solo para exportacion de lectura | SQLite resuelve el riesgo de corrupcion de datos que tiene CSV cuando multiples procesos escriben al mismo archivo. CSV queda habilitado unicamente como formato de exportacion (lectura). Actualiza parcialmente D-004. | El Contrato de Datos (T0.12) debe especificar SQLite como backend de escritura. El RF-06 del BRD ya asume este esquema. |
+| **D-008** | Control de auto-confirmacion: organizacional, no tecnico. El sistema NO bloquea que un analista confirme su propia prediccion | Implementar un bloqueo tecnico requeriria autenticacion real, lo cual fue descartado (CC-001). El costo de complejidad supera el riesgo de uso indebido dado el contexto de equipo pequeno. El control es via proceso operativo del cliente. | behavior.md (T0.7) no debe incluir escenario de bloqueo tecnico de auto-confirmacion. El flujo de US-03 es permisivo a nivel sistema. |
+| **D-009** | Extensibilidad v1.0 restringida a datasets con mismo numero de features (4 numericas), distinto target. Formulario dinamico para N-features requiere CC aprobado | Mantiene el formulario de ingreso simple y testeable en v1.0. Evitar la sobre-ingenieria de un formulario dinamico sin un caso de uso concreto y aprobado. | CA-06 del BRD refleja esta restriccion. El SAD y SpecDD deben documentar este limite explicito de extensibilidad. |
+| **D-010** | CA-02 dividida en CA-02a y CA-02b para desbloquear el flujo BDD sin esperar al modelo entrenado | CA-02 original mezclaba la verificacion del mecanismo de advertencia (testeable con mock) con la validacion de inputs especificos post-entrenamiento. Dividirla permite iniciar behavior.md y los tests inmediatamente. | CA-02a habilita T0.7 (behavior.md) sin bloqueo. CA-02b se completa en el anexo de calibracion post Phase Modeling. Los tests de CA-02a usan mock de modelo con prob=[0.45, 0.30, 0.25]. |
+| **D-011** | Umbral de baja confianza 0.60: calibrable post-entrenamiento. Criterio objetivo: ≤15% de predicciones del test set de Iris deben activar la advertencia | Un umbral fijo sin criterio de calibracion es un parametro magico. El criterio del 15% hace verificable si el umbral es correcto para la distribucion real de Iris, sin imponer un valor arbitrario permanente. | El valor 0.60 es el punto de partida para Phase Modeling. Si la calibracion arroja que ≤15% del test set activa la advertencia con ese umbral, se mantiene. Si no, se ajusta con CC. |
+
+---
+
+### Lecciones Aprendidas
+
+| # | Leccion | Contexto |
+| :--- | :--- | :--- |
+| **L-007** | Una segunda ronda de auditoria devil's advocate es necesaria cuando la primera ronda genera cambios estructurales. Los cambios de Ronda 1 pueden introducir nuevas inconsistencias que solo se detectan al releer el BRD completo con ojos frescos. | CA-02 fue "reparada" en Ronda 1 con valores concretos, pero el arreglo creo un nuevo problema: mezclaba un test de mecanismo (mock) con un test de datos reales (post-entrenamiento). Solo Ronda 2 lo detecto. |
+| **L-008** | Dividir un criterio de aceptacion en dos (CA-02a / CA-02b) es una tecnica valida para desbloquear el ciclo BDD sin sacrificar la trazabilidad. No hay que esperar a tener todos los insumos para iniciar el behavior.md; se puede avanzar en lo testeable y marcar el resto como pendiente con placeholder explicito. | Sin esta division, T0.7 hubiera quedado bloqueada hasta terminar Phase Modeling. Con la division, CA-02a habilita el 90% del behavior.md inmediatamente. |
+| **L-009** | Los parametros calibrables (como thresholds de confianza) deben tener un criterio de aceptacion objetivo desde el BRD, no solo un valor inicial. La pregunta correcta no es "cual es el umbral" sino "como sabemos que el umbral es correcto". | El umbral 0.60 sin criterio de calibracion es un parametro magico. El criterio ≤15% lo convierte en una hipotesis verificable. |
