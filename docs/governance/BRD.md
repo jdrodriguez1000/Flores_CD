@@ -2,13 +2,15 @@
 ## Proyecto: Flores_CD — Clasificador de Especies Iris
 
 > **Documento:** Business Requirements Document
-> **Version:** 1.3.0
+> **Version:** 1.5.0
 > **Estado:** Aprobado
 > **Fecha:** 2026-04-28
 > **Ultima actualizacion:** 2026-04-28
 > **Cambios v1.1.0:** CC-001 (analista_id), correcciones C-2, C-3, I-1, I-2, I-3, I-4 (auditoria devil's advocate)
 > **Cambios v1.2.0:** Resolucion vacios C-1 (modelo despliegue multi-usuario) y C-2 (restriccion auto-confirmacion como control organizacional); correcciones I-1 (CA-02), I-2 (umbral 0.60), I-3 (segundo analista incierto), I-4 (alcance extensibilidad), I-5 (timestamp_confirmacion)
 > **Cambios v1.3.0:** C-1 CA-02 dividido en CA-02a y CA-02b (desbloqueo secuencia BDD); I-1 CA-06 y RF-07 restringidos a mismo numero de features (Opcion A); I-2 session state RF-01a; I-3 SQLite decidido en RF-06 y RNF-03; M-1 trazabilidad; M-2 firmas; M-3 dataset referencia KPI-T-04; M-4 baseline 100% como proxy declarado
+> **Cambios v1.4.0:** CC-002 (shadow testing — modelo control y modelo tratamiento): RF-08 nuevo, aclaracion en RF-02 y RF-05, esquema SQLite expandido a 17 campos en RF-06, KPI-T-05 nuevo, alcance shadow testing en Seccion 11.2
+> **Cambios v1.5.0:** CC-003 (decision explicita del Analista 1 — aceptar/rechazar): RF-04 expandido con mecanismo de aceptacion/rechazo y nuevo estado `confirmada_a1`; RF-05 maquina de estados actualizada con vista de Analista 2 enriquecida; RF-06 esquema expandido a 20 campos (+`decision_analista1`, +`especie_analista1`, +`timestamp_decision_analista1`); KPI-T-05 actualizado con veredicto final como ground truth
 > **Autor:** ai-business-strategist
 > **Trazabilidad:** shared_understanding.md (Q1-Q9) → BRD v1.3.0 → behavior.md (pendiente)
 > **Aprobado por:** jdrodriguez1000 (Product Owner)
@@ -147,6 +149,8 @@ El analista debe ingresar los cuatro valores manualmente y presionar el boton "C
 
 [Fuente: Q6]
 
+> **Nota CC-002:** La prediccion mostrada al analista corresponde siempre al **modelo control** (el modelo estable en produccion). Ver RF-08 para el comportamiento del modelo tratamiento.
+
 Al presionar "Clasificar", el sistema debe mostrar:
 
 1. La especie predicha (Iris setosa, Iris versicolor o Iris virginica).
@@ -158,34 +162,64 @@ Al presionar "Clasificar", el sistema debe mostrar:
 
 El sistema debe evaluar el valor maximo de probabilidad entre las tres clases. Si ese valor es inferior a 0.60, debe mostrar una advertencia visual clara al analista indicando que la prediccion tiene baja confianza y requiere revision adicional.
 
-### RF-04: Registro de Prediccion como "Revision Pendiente"
+### RF-04: Decision Explicita del Analista 1 y Registro de Estado
 
-[Fuente: Q7 — CC-001]
+[Fuente: Q7 — CC-001, CC-003]
 
-Cuando el modelo emite una advertencia de baja confianza (max(prob) < 0.60), el sistema debe registrar automaticamente la prediccion con estado `pendiente` en el almacenamiento local, incluyendo el `analista_id` del analista que genero la prediccion. El analista no puede activar el comite directamente desde el sistema; el flujo correcto es que un segundo analista (con `analista_id` diferente) confirme la prediccion en una sesion posterior.
+Tras cada clasificacion, el sistema presenta al Analista 1 dos botones de decision:
 
-**Control organizacional de auto-confirmacion:** El sistema registra el `analista_id` generador de cada prediccion `pendiente` y lo muestra en la cola de revisiones para que el segundo analista pueda identificar el origen. Sin embargo, el sistema **no bloquea tecnicamente** la confirmacion por parte del mismo `analista_id`, dado que no valida la autenticidad del identificador (RF-01a). La responsabilidad de respetar este control es organizacional: el proceso interno de Floristeria CD exige que un analista diferente al generador sea quien confirme o corrija cada prediccion pendiente.
+- **"Aceptar":** El Analista 1 esta de acuerdo con la especie predicha por el modelo control.
+- **"Rechazar":** El Analista 1 no esta de acuerdo. Al rechazar, aparece un selector de especie donde el Analista 1 debe elegir la especie que considera correcta antes de enviar el caso a revision.
+
+**Triggers del estado `pendiente` — dos mecanismos independientes:**
+
+1. **Automatico (baja confianza):** Si `max(prob) < 0.60`, el sistema registra la prediccion como `pendiente` independientemente de la decision del Analista 1. La advertencia visual (RF-03) se muestra de todas formas. Si el Analista 1 acepta un caso de baja confianza, el estado sigue siendo `pendiente` porque el modelo mismo lo ha marcado como incierto.
+2. **Manual (rechazo del Analista 1):** Si el Analista 1 rechaza la prediccion (incluso con alta confianza), el sistema registra el estado como `pendiente` y almacena la especie elegida por el Analista 1 en `especie_analista1`.
+
+**Trigger del estado `confirmada_a1`:** Si `max(prob) >= 0.60` Y el Analista 1 acepta la prediccion, el estado se registra como `confirmada_a1` y el caso se cierra sin pasar a revision por Analista 2.
+
+**Control organizacional de auto-confirmacion:** El sistema registra el `analista_id` generador de cada prediccion `pendiente` y lo muestra en la cola de revisiones. El sistema **no bloquea tecnicamente** la confirmacion por el mismo `analista_id` (CC-001, D-008). La responsabilidad de respetar este control es organizacional.
 
 ### RF-05: Cola de Revisiones Pendientes y Estados Terminales
 
 [Fuente: Q7, Q9 — CC-001]
 
-El dashboard debe incluir una vista de "cola de revisiones pendientes" donde cualquier analista (con `analista_id` diferente al generador) pueda ver las predicciones con estado `pendiente` y resolverlas. Las transiciones de estado permitidas son:
+> **Nota CC-002:** El flujo de estados aplica **exclusivamente a las predicciones del modelo control**. Los registros del modelo tratamiento tienen estado fijo `shadow` y no participan en la cola de revisiones (ver RF-08).
 
-| Accion del segundo analista | Estado resultante | Descripcion |
+**Maquina de estados completa del sistema:**
+
+| Trigger | Estado resultante | Requiere Analista 2 |
 | :--- | :--- | :--- |
-| Confirma la especie predicha | `confirmada` | El segundo analista acepta la clasificacion del modelo. `especie_confirmada` = `especie_predicha`. |
-| Corrige la especie predicha | `corregida` | El segundo analista selecciona una especie diferente. Se registran ambas: `especie_predicha` (original del modelo) y `especie_confirmada` (correccion del analista). |
+| Alta confianza + Analista 1 acepta | `confirmada_a1` | No — caso cerrado |
+| Baja confianza (auto, cualquier decision del Analista 1) | `pendiente` | Si |
+| Alta confianza + Analista 1 rechaza | `pendiente` | Si |
+| Analista 2 confirma la clasificacion | `confirmada` | — |
+| Analista 2 elige especie diferente | `corregida` | — |
 
-**No existe transicion a "requiere comite" desde el sistema.** Esta decision es deliberada (D-003): el flujo de baja confianza termina siempre con la confirmacion o correccion por un segundo analista, sin activar el comite de tres expertos.
+El dashboard debe incluir una vista de "cola de revisiones pendientes" donde cualquier analista (con `analista_id` diferente al generador) pueda ver las predicciones con estado `pendiente` y resolverlas.
 
-**Obligacion del segundo analista:** El segundo analista debe emitir siempre un juicio definitivo (`confirmada` o `corregida`). El sistema no provee una opcion "tambien incierto". Si el segundo analista tiene dudas, debe consultar fisicamente con un experto antes de registrar su decision en el sistema. Una vez registrado el estado terminal, el caso se considera cerrado.
+**Vista enriquecida para el Analista 2:** La cola de revisiones muestra, por cada prediccion `pendiente`:
+- Especie predicha por el modelo control + probabilidades
+- Decision del Analista 1: `aceptada` o `rechazada`
+- Especie elegida por el Analista 1 (si rechazo) — campo `especie_analista1`
+- `analista_id` del generador
+
+**Acciones del Analista 2:**
+
+| Accion | Estado resultante | Descripcion |
+| :--- | :--- | :--- |
+| Confirmar | `confirmada` | El Analista 2 acepta el criterio del Analista 1 (o del modelo si el A1 acepto). `especie_confirmada` = `especie_analista1` si hubo rechazo, o `especie_predicha` si no hubo rechazo. |
+| Corregir | `corregida` | El Analista 2 selecciona una especie diferente a la del Analista 1 y del modelo. Se registran ambas en `especie_predicha` y `especie_confirmada`. |
+
+**No existe transicion a "requiere comite" desde el sistema.** Esta decision es deliberada (D-003).
+
+**Obligacion del Analista 2:** Debe emitir siempre un juicio definitivo. El sistema no provee opcion "tambien incierto". Una vez registrado el estado terminal, el caso se considera cerrado.
 
 ### RF-06: Persistencia Local del Historial de Predicciones
 
 [Fuente: Q9 — CC-001]
 
-El sistema debe persistir el historial completo de predicciones en una base de datos SQLite local, accesible en cualquier sesion del dashboard independientemente del analista que lo abra. La exportacion del historial a CSV es una funcionalidad de lectura opcional (no de escritura); el almacenamiento primario es siempre SQLite. El esquema minimo requerido por registro es:
+El sistema debe persistir el historial completo de predicciones en una base de datos SQLite local, accesible en cualquier sesion del dashboard independientemente del analista que lo abra. La exportacion del historial a CSV es una funcionalidad de lectura opcional (no de escritura); el almacenamiento primario es siempre SQLite. El esquema minimo requerido por registro es (20 campos totales: 14 originales + 3 de shadow testing en CC-002 + 3 de decision del Analista 1 en CC-003):
 
 | Campo | Tipo | Descripcion |
 | :--- | :--- | :--- |
@@ -204,6 +238,12 @@ El sistema debe persistir el historial completo de predicciones en una base de d
 | `analista_confirmador_id` | string | ID del segundo analista. Nulo si estado = `pendiente`. |
 | `especie_confirmada` | string | Especie final aceptada. Nulo si estado = `pendiente`. |
 | `timestamp_confirmacion` | datetime | Momento en que el segundo analista registro el estado terminal. Nulo si estado = `pendiente`. |
+| `model_id` | string | Identificador de version del modelo que genero la prediccion (ej: `control_v1`, `tratamiento_v2`) |
+| `model_role` | string | Rol del modelo: `control` o `tratamiento` |
+| `is_shadow` | bool | True si la prediccion corresponde al modelo tratamiento (no expuesta al analista) |
+| `decision_analista1` | string | Decision del Analista 1: `aceptada` o `rechazada`. Nulo para registros del modelo tratamiento. |
+| `especie_analista1` | string | Especie elegida por el Analista 1 al rechazar la prediccion. Nulo si acepto o si es registro shadow. |
+| `timestamp_decision_analista1` | datetime | Momento en que el Analista 1 registro su decision. Nulo para registros shadow. |
 
 ### RF-07: Extensibilidad Modular
 
@@ -212,6 +252,27 @@ El sistema debe persistir el historial completo de predicciones en una base de d
 La arquitectura del sistema debe ser modular, de forma que los componentes de ingestion de datos, preprocesamiento, prediccion y visualizacion puedan ser reutilizados o reemplazados para clasificar otras especies botanicas distintas al Iris de Fisher, sin necesidad de reescribir el sistema completo.
 
 **Alcance de la extensibilidad en v1.0:** El sistema soporta la sustitucion del modelo entrenado sobre Iris de Fisher por otro modelo entrenado sobre un dataset con el mismo numero de features numericas (4) y distinto target de clases. La generacion dinamica de formularios para datasets con numero de features diferente queda fuera del alcance de esta version y requerira un Control de Cambios aprobado.
+
+### RF-08: Shadow Testing — Modelo Control y Modelo Tratamiento
+
+[Fuente: CC-002 — requerimiento del cliente 2026-04-28]
+
+El sistema debe soportar la ejecucion simultanea de dos modelos de clasificacion sobre cada input del analista:
+
+**Modelo control:** El modelo estable en produccion. Su prediccion y probabilidades se muestran al analista en el dashboard (RF-02). Toda la logica de advertencia de baja confianza (RF-03), registro de estado (RF-04, RF-05) y persistencia operativa aplica exclusivamente al modelo control.
+
+**Modelo tratamiento:** El modelo candidato bajo evaluacion. Opera en modo sombra: recibe el mismo input que el modelo control de forma simultanea, pero su prediccion NO se expone al analista. Sus resultados se almacenan automaticamente con `model_role = tratamiento` e `is_shadow = True` para analisis de divergencia offline (KPI-T-05). El modelo tratamiento no participa en el flujo de estados `pendiente / confirmada / corregida`.
+
+**Comportamiento requerido:**
+1. Al recibir un input del analista, el sistema invoca ambos modelos.
+2. Solo la prediccion del modelo control se muestra en el dashboard.
+3. Ambas predicciones se persisten en SQLite con su respectivo `model_id` y `model_role`.
+4. Si el modelo tratamiento no esta disponible (no configurado), el sistema opera normalmente con solo el modelo control, sin error ni advertencia al analista.
+
+**Restricciones de alcance en v1.0:**
+- El sistema NO promueve automaticamente el modelo tratamiento a control. La promocion es una decision manual del Product Owner con CC aprobado.
+- El sistema NO implementa division de trafico (A/B testing con split de analistas). Ambos modelos reciben el 100% de los inputs.
+- El sistema NO expone los resultados del modelo tratamiento al analista en ninguna vista del dashboard en esta version.
 
 ---
 
@@ -300,6 +361,7 @@ Todos los enlaces en documentos y referencias en el codigo deben usar rutas rela
 | **KPI-T-02** | Accuracy | >= 0.95 | Metrica de comunicacion con stakeholders. Complementa el F1-score. |
 | **KPI-T-03** | Recall por clase (Confusion Matrix) | >= 0.90 para cada clase | Detecta confusiones sistematicas, especialmente entre versicolor y virginica. Ningun clase puede ser ignorada por el modelo. |
 | **KPI-T-04** | Advertencia de confianza | Activar si max(prob) < 0.60 | Mecanismo operativo para reducir escalaciones al comite. No es metrica del modelo sino del sistema. Umbral acordado con el cliente como valor inicial de operacion; debe calibrarse post-entrenamiento para que no mas del 15% de las predicciones del conjunto de test de Iris de Fisher activen la advertencia. Si la calibracion indica un umbral diferente, se emitira un CC antes del despliegue. |
+| **KPI-T-05** | Divergencia y precision relativa control vs. tratamiento | Medicion offline usando el veredicto final como ground truth: (1) `especie_predicha` del control vs. veredicto final; (2) `especie_predicha` del tratamiento vs. veredicto final; (3) % de inputs donde ambos modelos divergen entre si. **Ground truth por estado:** `confirmada_a1` → especie predicha por modelo control; `confirmada` → `especie_analista1`; `corregida` → `especie_confirmada`. No tiene threshold de aceptacion en v1.0; sirve como insumo para la decision de promocion del modelo tratamiento a control. |
 
 **Metricas excluidas:**
 - AUC-ROC multiclase: excluida por no aportar valor operativo adicional con dataset balanceado (Decision D-001).
@@ -395,6 +457,9 @@ El ROI no se mide en puntos de accuracy: se mide en capacidad operativa recupera
 - **Sin autenticacion de usuarios:** El sistema no implementa gestion de identidad, control de acceso ni validacion de credenciales. El campo `analista_id` (RF-01a, CC-001) es un identificador de texto libre registrado para trazabilidad operativa; el sistema no verifica su autenticidad. Cualquier usuario con acceso local puede ingresar cualquier identificador.
 - **Sin reentrenamiento automatico:** El modelo se entrena offline y se serializa. El sistema no implementa pipelines de reentrenamiento continuo en esta fase.
 - **Sin AUC-ROC multiclase:** Metrica excluida explicitamente (Decision D-001) por no aportar valor operativo adicional con el dataset balanceado de Iris de Fisher.
+- **Shadow testing — alcance incluido y excluido (CC-002):**
+  - *Incluido en v1.0:* Ejecucion simultanea de modelo control y modelo tratamiento sobre cada input; almacenamiento diferenciado de predicciones con `model_id`, `model_role` e `is_shadow`; calculo de KPI-T-05 (divergencia offline).
+  - *Excluido en v1.0:* Promocion automatica del modelo tratamiento a control; division de trafico entre analistas (A/B testing con split de usuarios); exposicion de predicciones del modelo tratamiento al analista en el dashboard; reentrenamiento automatico del modelo tratamiento.
 
 ---
 
@@ -402,13 +467,14 @@ El ROI no se mide en puntos de accuracy: se mide en capacidad operativa recupera
 
 | Rol | Nombre | Fecha | Estado |
 | :--- | :--- | :--- | :--- |
-| **Product Owner / Usuario** | jdrodriguez1000 | 2026-04-28 | Aprobado v1.3.0 (historial: v1.1.0, v1.2.0) |
+| **Product Owner / Usuario** | jdrodriguez1000 | 2026-04-28 | Aprobado v1.5.0 (historial: v1.1.0, v1.2.0, v1.3.0, v1.4.0) |
 | **Agente Responsable (ai-business-strategist)** | claude-sonnet-4-6 | 2026-04-28 | Emitido |
 
 ---
 
 > **Trazabilidad documental:**
 > - Fuente primaria: `docs/Phase_discovery/shared_understanding.md` (Q1-Q9, firmado 2026-04-28)
-> - Decisiones registradas: `docs/references/decisions.md` (D-001 a D-005)
-> - Siguiente documento: `docs/governance/behavior.md` (BDD Contract — pendiente T0.7)
+> - Decisiones registradas: `docs/references/decisions.md` (D-001 a D-015)
+> - Control de cambios: `docs/changes/CC-001.md`, `docs/changes/CC-002.md`
+> - Siguiente documento: `docs/governance/behavior.md` (BDD Contract — pendiente T0.7; debe incluir escenarios Gherkin de shadow testing basados en RF-08)
 > - Metodologia: SpecDD + BDD + TDD segun `CLAUDE.md` y `docs/methodology/process.md`

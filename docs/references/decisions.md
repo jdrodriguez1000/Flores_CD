@@ -121,3 +121,53 @@
 | **L-007** | Una segunda ronda de auditoria devil's advocate es necesaria cuando la primera ronda genera cambios estructurales. Los cambios de Ronda 1 pueden introducir nuevas inconsistencias que solo se detectan al releer el BRD completo con ojos frescos. | CA-02 fue "reparada" en Ronda 1 con valores concretos, pero el arreglo creo un nuevo problema: mezclaba un test de mecanismo (mock) con un test de datos reales (post-entrenamiento). Solo Ronda 2 lo detecto. |
 | **L-008** | Dividir un criterio de aceptacion en dos (CA-02a / CA-02b) es una tecnica valida para desbloquear el ciclo BDD sin sacrificar la trazabilidad. No hay que esperar a tener todos los insumos para iniciar el behavior.md; se puede avanzar en lo testeable y marcar el resto como pendiente con placeholder explicito. | Sin esta division, T0.7 hubiera quedado bloqueada hasta terminar Phase Modeling. Con la division, CA-02a habilita el 90% del behavior.md inmediatamente. |
 | **L-009** | Los parametros calibrables (como thresholds de confianza) deben tener un criterio de aceptacion objetivo desde el BRD, no solo un valor inicial. La pregunta correcta no es "cual es el umbral" sino "como sabemos que el umbral es correcto". | El umbral 0.60 sin criterio de calibracion es un parametro magico. El criterio ≤15% lo convierte en una hipotesis verificable. |
+
+---
+
+## [2026-04-28] — CC-002: Shadow Testing
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documento afectado:** `docs/governance/BRD.md` (v1.3.0 → v1.4.0)
+
+---
+
+### Control de Cambios
+
+| CC-ID | Cambio | Justificacion | Ficha |
+| :--- | :--- | :--- | :--- |
+| **CC-002** | Incorporar shadow testing con modelo control y modelo tratamiento | El cliente exige evaluar modelos candidatos en produccion real sin impacto operativo para los analistas. Ejecucion simultanea de ambos modelos; solo el control es visible. | `docs/changes/CC-002.md` |
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-012** | Shadow testing como capacidad de primera clase en v1.0: modelo control (visible) y modelo tratamiento (sombra) con almacenamiento diferenciado | El cliente lo exige para evaluar nuevas versiones sin interrumpir el flujo operativo. La arquitectura de doble modelo desde v1.0 evita una refactorizacion costosa en fases posteriores. | El SAD (T0.10) debe disenar la capa de gestion de modelos con dos artefactos y roles. El SpecDD (T0.11) debe definir el dispatcher de prediccion. El Contrato de Datos (T0.12) debe incluir los 3 nuevos campos del esquema SQLite. behavior.md (T0.7) debe incluir escenarios Gherkin de shadow testing. |
+| **D-013** | El modelo tratamiento NO participa en el flujo de estados `pendiente/confirmada/corregida`. Sus registros tienen estado fijo `shadow`. | Mantener el flujo operativo simple para el analista. La comparacion de modelos es una actividad offline del Product Owner, no una tarea del analista. | behavior.md (T0.7) no debe incluir escenarios de revision de predicciones shadow por parte del analista. |
+| **D-014** | La promocion del modelo tratamiento a control es manual y requiere CC aprobado. No hay promocion automatica. | Garantiza que toda transicion de modelo en produccion pase por gobernanza explicita. Evita regresiones silenciosas. | El SAD (T0.10) debe documentar el mecanismo de swap de modelos como operacion manual con trazabilidad. |
+
+---
+
+## [2026-04-28] — CC-003: Decision Explicita del Analista 1
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documento afectado:** `docs/governance/BRD.md` (v1.4.0 → v1.5.0)
+
+---
+
+### Control de Cambios
+
+| CC-ID | Cambio | Justificacion | Ficha |
+| :--- | :--- | :--- | :--- |
+| **CC-003** | Agregar decision explicita del Analista 1 (Aceptar/Rechazar) tras cada clasificacion | Sin este mecanismo el escenario de FP de alta confianza quedaba sin cobertura. Ademas provee el ground truth necesario para que el shadow test sea comparable. | `docs/changes/CC-003.md` |
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-015** | El Analista 1 debe emitir siempre una decision explicita (Aceptar/Rechazar) tras cada clasificacion. Alta confianza + Aceptar = `confirmada_a1` (caso cerrado). Cualquier Rechazo o Baja confianza = `pendiente` (va a revision). | Cierra el gap del Falso Positivo de alta confianza y genera ground truth operativo para el shadow test sin infraestructura adicional. | RF-04 y RF-05 del BRD reflejan la maquina de estados completa. El SpecDD (T0.11) debe definir la interfaz del dispatcher con el parametro de decision del Analista 1. behavior.md (T0.7) debe incluir escenarios Gherkin para los cuatro caminos: alta confianza + acepta, alta confianza + rechaza, baja confianza + acepta, baja confianza + rechaza. |
