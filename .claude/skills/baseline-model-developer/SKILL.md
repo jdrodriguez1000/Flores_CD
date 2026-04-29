@@ -1,32 +1,54 @@
 ---
 name: baseline-model-developer
-description: Protocolo para la creación de modelos de referencia (Baselines) y la orquestación de experimentos iniciales para el ciclo TDD de IA.
+description: Protocolo para establecer el Modelo Control como Baseline oficial del proyecto, instanciar el Modelo Tratamiento como Challenger, y preparar la infraestructura de experimentos para el Shadow Test.
 user-invocable: false
 agent: ai-data-scientist
 allowed-tools: [Read, Write, Edit, Python-Interpreter]
 ---
 
-## 🏗️ I. Definición del Baseline Tecnológico
-El agente debe establecer el punto de partida mínimo:
-1. **Modelos Heurísticos / Reglas de Negocio:** Implementar el "Dummy Classifier/Regressor" o reglas simples de la industria para justificar el uso de ML.
-2. **Modelo "Vanilla":** Entrenamiento de un algoritmo estándar (ej: Regresión Logística o Árbol de Decisión simple) sin optimización de hiperparámetros.
-3. **Métricas Base:** Registro oficial de las métricas obtenidas por el proceso actual del cliente (si existe).
+## 🏗️ I. Definición del Baseline a partir del Torneo
+El Baseline **no se elige aquí**: es el **Modelo Control** ya seleccionado por el `algorithm-architecture-evaluator`. Esta skill lo formaliza e instrumenta:
 
-## 📐 II. Orquestación de Experimentos Iniciales
-1. **Registro en Experiment Tracker:** Configuración de MLflow/W&B para que cada ejecución sea reproducible.
-2. **Fijación de Semillas (Seeds):** Garantizar que la aleatoriedad sea controlada (`random_state`) en todas las etapas.
-3. **Check de "Green" Inicial:** Proveer el script que pase el primer test de rendimiento definido por el QA Engineer.
+1. **Instancia del Modelo Control:** Entrenar el Control con sus hiperparámetros por defecto (sin optimización) sobre el dataset Gold completo.
+2. **Referencia Heurística:** Implementar un Dummy Classifier/Regressor para cuantificar la ganancia real de la IA sobre una predicción trivial.
+3. **Métricas Base Oficiales:** Registrar las métricas del Control (media CV + std) como el piso oficial del proyecto. Ningún experimento futuro puede estar por debajo de este piso.
 
-## 🚀 III. Informe de Benchmarking
-1. **Comparativa Baseline vs. Proceso Actual:** Cuantificación de la ganancia inicial de la IA.
-2. **Hoja de Ruta de Mejora:** Basado en el baseline, proponer qué áreas del modelo requieren mayor esfuerzo de refinamiento.
+## 📐 II. Instancia del Modelo Tratamiento (Challenger)
+Preparar el entorno del Challenger para el Shadow Test:
+
+1. **Entrenamiento Inicial del Tratamiento:** Entrenar el Modelo Tratamiento con sus hiperparámetros por defecto. Registrar sus métricas iniciales.
+2. **Delta de Precisión:** Documentar la diferencia de métrica primaria entre Tratamiento y Control: `Δ = Tratamiento - Control`. Este delta es el objetivo a sostener tras la optimización.
+3. **Validación de No-Regresión del Control:** Confirmar que el Control sigue siendo más estable que el Tratamiento (CV std Control < CV std Tratamiento). Si esto no se cumple, escalar al `algorithm-architecture-evaluator`.
+
+## 🚀 III. Preparación del Shadow Test
+1. **Registro en Experiment Tracker (MLflow/W&B):**
+   - Crear dos runs paralelos: `baseline_control` y `baseline_treatment`.
+   - Etiquetar ambos con `role: control` y `role: treatment` respectivamente.
+   - Fijar semillas (`random_state`) idénticas en ambos para garantizar comparabilidad.
+2. **Infra de Predicciones Paralelas:** Preparar el script que genere predicciones simultáneas de Control y Tratamiento sobre el mismo batch de datos (base del Shadow Test).
+3. **Artefactos de Registro:**
+   - `artifacts/baseline_control/` — modelo serializado + métricas + configuración.
+   - `artifacts/baseline_treatment/` — modelo serializado + métricas + configuración.
+
+## 📊 IV. Informe de Benchmarking Inicial
+
+| Modelo | Métrica Primaria (media CV) | CV Std | vs. Dummy | Rol |
+|---|---|---|---|---|
+| Dummy Classifier | ... | — | referencia | — |
+| Control | ... | ... | +X% | Baseline Oficial |
+| Tratamiento | ... | ... | +Y% | Shadow Challenger |
+
+- **Hoja de Ruta:** Basado en el delta inicial, proponer qué áreas requieren mayor refinamiento en la fase de optimización de hiperparámetros.
 
 ---
 
 > **Check de Certificación de Baseline:**
-> - [ ] ¿Se han fijado las semillas para garantizar la reproducibilidad de los resultados?
-> - [ ] ¿El baseline supera significativamente a una predicción aleatoria o una regla estúpida?
-> - [ ] ¿Se han registrado todos los artefactos (modelo, métricas, código) en el repositorio de experimentos?
+> - [ ] ¿El Modelo Control proviene del Torneo validado por `algorithm-architecture-evaluator`?
+> - [ ] ¿Se han fijado semillas idénticas en Control y Tratamiento para garantizar comparabilidad?
+> - [ ] ¿El Control supera significativamente al Dummy Classifier?
+> - [ ] ¿El CV std del Control es menor que el del Tratamiento (Control más estable)?
+> - [ ] ¿Ambos modelos están registrados en el Experiment Tracker con sus roles etiquetados?
+> - [ ] ¿Existe el script de predicciones paralelas listo para el Shadow Test?
 
 
 ---

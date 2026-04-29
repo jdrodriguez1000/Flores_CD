@@ -1,32 +1,58 @@
 ---
 name: hyperparameter-optimization-expert
-description: Protocolo para la ejecución de optimización de hiperparámetros avanzada utilizando técnicas Bayesianas u Optuna para maximizar el rendimiento del modelo.
+description: Protocolo para la optimización de hiperparámetros diferenciada por rol — estabilidad para el Modelo Control y máxima precisión para el Modelo Tratamiento — usando técnicas Bayesianas u Optuna.
 user-invocable: false
 agent: ai-data-scientist
 allowed-tools: [Read, Write, Bash, Python-Interpreter]
 ---
 
-## 🏗️ I. Definición del Espacio de Búsqueda
-El agente debe establecer los rangos técnicos para cada hiperparámetro crítico:
-1. **Selección de Parámetros:** Identificar cuáles influyen más en el sobreajuste (*Overfitting*) vs. capacidad de aprendizaje.
-2. **Definición de Distribuciones:** Utilizar escalas logarítmicas para parámetros de magnitud (ej: *learning rate*) y lineales para contadores (ej: *max depth*).
-3. **Optimización Multi-objetivo:** Si es necesario, optimizar tanto la métrica principal como la latencia o el tamaño del modelo.
+## 🏗️ I. Definición del Espacio de Búsqueda por Rol
+La optimización **no es igual para ambos modelos**. El objetivo difiere según el rol asignado por el Torneo:
+
+### Control — Objetivo: Estabilidad
+- **Métrica de optimización:** Minimizar `CV std` (varianza entre folds) dentro del rango de métricas primarias que superen el umbral del BRD.
+- **Espacio de búsqueda restringido:** Preferir rangos conservadores para parámetros de regularización (`min_child_weight`, `lambda`, `alpha`). Priorizar modelos que no sobreajusten.
+- **Criterio de parada:** El Control óptimo es el que maximiza `(métrica_primaria / CV_std)` — el mejor ratio precisión/estabilidad.
+
+### Tratamiento — Objetivo: Máxima Precisión
+- **Métrica de optimización:** Maximizar la métrica primaria del BRD (ej: F1-macro, AUC-ROC, MAE).
+- **Espacio de búsqueda amplio:** Explorar configuraciones más agresivas (`learning_rate`, `max_depth`, `num_leaves`) aceptando mayor varianza si gana en precisión.
+- **Restricción de Efficiency Gate:** El espacio de búsqueda debe estar acotado para que el modelo resultante siga dentro de los límites de latencia/memoria aprobados en el Torneo.
 
 ## 📐 II. Ejecución con Estrategia de Poda (Pruning)
+Ambas optimizaciones comparten la misma infraestructura técnica pero con estudios Optuna separados:
+
 1. **Bayesian Optimization:** Uso de procesos gaussianos para explorar el espacio de forma inteligente reduciendo el número de iteraciones.
-2. **Early Stopping / Pruning:** Implementar algoritmos (ej: Median Pruner) para detener experimentos que no prometen superar al mejor resultado actual.
-3. **Cross-Validation Robusta:** Asegurar que cada combinación de hiperparámetros sea evaluada mediante validación cruzada para garantizar la estabilidad.
+2. **Early Stopping / Pruning:** Implementar `MedianPruner` para detener experimentos que no prometen superar al mejor resultado actual del mismo run.
+3. **Cross-Validation Robusta:** Mínimo 5-fold estratificado. Cada combinación de hiperparámetros se evalúa con la misma semilla fijada en el `baseline-model-developer`.
+4. **Estudios Paralelos en MLflow:** Registrar `study_control` y `study_treatment` como runs separados con tag `role`.
+
+```python
+# Estructura de estudios separados
+study_control   = optuna.create_study(direction="maximize", study_name="control_stability")
+study_treatment = optuna.create_study(direction="maximize", study_name="treatment_precision")
+```
 
 ## 🚀 III. Certificación de Hiperparámetros
-1. **Análisis de Sensibilidad:** Identificar qué parámetros fueron determinantes en el éxito.
-2. **Exportación de Configuración:** Generar el archivo `.json` o `.yaml` con la configuración final para el ML Engineer.
+
+1. **Análisis de Sensibilidad:** Para cada estudio, identificar qué parámetros fueron determinantes.
+2. **Validación de Roles:** Confirmar que tras la optimización:
+   - El Control mantiene menor `CV std` que el Tratamiento.
+   - El Tratamiento mantiene mayor métrica primaria que el Control.
+   - Si los roles se invierten, escalar al `algorithm-architecture-evaluator` para revisión del Torneo.
+3. **Exportación de Configuraciones:** Generar dos artefactos independientes:
+   - `config/hyperparams_control.yaml`
+   - `config/hyperparams_treatment.yaml`
 
 ---
 
 > **Check de Certificación de Optimización:**
-> - [ ] ¿Se ha evitado el sobreajuste mediante una validación cruzada adecuada?
-> - [ ] ¿El espacio de búsqueda definido es lo suficientemente amplio para encontrar el óptimo global?
-> - [ ] ¿Se han registrado todas las pruebas en el sistema de Experiment Tracking (MLflow)?
+> - [ ] ¿Se han ejecutado estudios Optuna **separados** para Control y Tratamiento?
+> - [ ] ¿El Control se optimizó por ratio `precisión/estabilidad` y no solo por métrica primaria?
+> - [ ] ¿El Tratamiento sigue dentro del Efficiency Gate (latencia/memoria) tras la optimización?
+> - [ ] ¿Los roles (Control más estable, Tratamiento más preciso) se mantienen post-optimización?
+> - [ ] ¿Se han registrado ambos estudios en MLflow con tags `role: control` / `role: treatment`?
+> - [ ] ¿Se ha evitado el sobreajuste mediante validación cruzada adecuada en ambos?
 
 
 ---
