@@ -292,6 +292,8 @@ El sistema debe soportar la ejecucion simultanea de dos modelos de clasificacion
    - **No configurado** (artefacto ausente en disco o flag desactivado en configuracion): el sistema opera normalmente con solo el modelo control, sin error ni advertencia al analista. Es un estado esperado de operacion.
    - **Configurado pero falla en runtime** (modelo cargado pero error al inferir): el sistema registra el error en el log interno, no expone ningun mensaje al analista, y continua la operacion con solo el modelo control. El registro del modelo tratamiento no se escribe en SQLite para ese ciclo.
 
+**Transaccion Atomica DB:** La escritura a base de datos debe realizarse mediante un bloque transaccional atómico. Si ocurre un fallo en el Modelo Control (RF-08b), se realiza un ROLLBACK completo, evitando registros shadow huérfanos.
+
 **Restricciones de alcance en v1.0:**
 - El sistema NO promueve automaticamente el modelo tratamiento a control. La promocion es una decision manual del Product Owner con CC aprobado.
 - El sistema NO implementa division de trafico (A/B testing con split de analistas). Ambos modelos reciben el 100% de los inputs.
@@ -500,4 +502,6 @@ El ROI no se mide en puntos de accuracy: se mide en capacidad operativa recupera
 > - Decisiones registradas: `docs/references/decisions.md` (D-001 a D-030)
 > - Control de cambios: `docs/changes/CC-001.md`, `docs/changes/CC-002.md`
 > - Siguiente documento: `docs/governance/behavior.md` (BDD Contract — **T0.7 HABILITADA**; debe incluir escenarios Gherkin de shadow testing basados en RF-08)
+> - Metodologia: SpecDD + BDD + TDD segun `CLAUDE.md` y `docs/methodology/process.md`
+.7 HABILITADA**; debe incluir escenarios Gherkin de shadow testing basados en RF-08)
 > - Metodologia: SpecDD + BDD + TDD segun `CLAUDE.md` y `docs/methodology/process.md`

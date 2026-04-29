@@ -248,7 +248,7 @@
 | **D-026** | Cola de pendientes con filtrado tecnico: la consulta SQLite aplica `WHERE estado = 'pendiente' AND analista_id != [analista_id_sesion]`. El analista no ve sus propios casos. | Aunque D-008 establece que la auto-confirmacion no se bloquea tecnicamente, ocultar los casos propios en la cola reduce la friccion de confusion ("por que aparece mi caso aqui") sin requerir autenticacion. Es consistente con D-008 porque el bloqueo de escritura sigue siendo organizacional; solo se filtra la vista de lectura. | RF-05 actualizado. El SpecDD debe definir la consulta de la cola como parametrizada con `analista_id_sesion`. El SpecDD de la capa de persistencia debe reflejar este patron de consulta. |
 | **D-027** | El label del boton "Confirmar" del A2 se renderiza de forma diferenciada segun el origen de la especie: "Confirmar especie del Analista 1: [X]" cuando `especie_analista1` tiene valor; "Confirmar especie del modelo: [X]" cuando `especie_analista1` es NULL. | Sin esta diferenciacion, el A2 no sabe si esta confirmando una decision humana o una prediccion del modelo. Son dos actos con distinto peso semantico. Hacerlo explicito en el label elimina ambiguedad sin agregar complejidad de implementacion. | RF-05 actualizado. El SpecDD de la capa UI debe definir la logica de renderizado del label como una funcion determinista sobre `especie_analista1`. El behavior.md (T0.7) debe incluir un escenario Gherkin para cada caso del label. |
 | **D-028** | Tras la decision del A2 (Confirmar o Corregir), el sistema muestra un mensaje de confirmacion ("Caso cerrado correctamente") y el A2 permanece en la vista de cola con los casos restantes. El caso cerrado solo es accesible desde la vista de historial. | Un regreso silencioso sin mensaje deja al A2 sin feedback de que su accion fue registrada. El mensaje de confirmacion es el minimo necesario para cerrar el ciclo de interaccion. Permanecer en la cola (en lugar de redirigir a otra vista) es la opcion de menor friccion para analistas que procesan multiples casos en una sesion. | RF-05 actualizado. El SpecDD y el behavior.md deben incluir el estado post-accion del A2 como parte del escenario de US-03. |
-| **D-029** | `prediction_batch_id` se genera y almacena en el registro del modelo control en todos los ciclos de prediccion, independientemente de si el modelo tratamiento esta configurado. Cuando no hay registro shadow, el UUID queda sin par — esto es esperado y no es un error. | Generar el UUID siempre simplifica el dispatcher (no necesita condicionales sobre la disponibilidad del tratamiento para decidir si genera el UUID). Ademas, permite que si el tratamiento se configura posteriormente, los registros de control anteriores ya tengan UUID y sean elegibles para futuros calculos de KPI-T-05 si el ground truth esta disponible. | RF-06 actualizado (`prediction_batch_id`). RF-08 actualizado (el dispatcher genera el UUID antes de cualquier invocacion a los modelos). El SpecDD debe reflejar este orden de operaciones en el dispatcher. |
+| **D-029** | `prediction_batch_id` se genera y almacena en el registro del modelo control en todos ciclos de prediccion, independientemente de si el modelo tratamiento esta configurado. Cuando no hay registro shadow, el UUID queda sin par — esto es esperado y no es un error. | Generar el UUID siempre simplifica el dispatcher (no necesita condicionales sobre la disponibilidad del tratamiento para decidir si genera el UUID). Ademas, permite que si el tratamiento se configura posteriormente, los registros de control anteriores ya tengan UUID y sean elegibles para futuros calculos de KPI-T-05 si el ground truth esta disponible. | RF-06 actualizado (`prediction_batch_id`). RF-08 actualizado (el dispatcher genera el UUID antes de cualquier invocacion a los modelos). El SpecDD debe reflejar este orden de operaciones en el dispatcher. |
 | **D-030** | CA-03 y CA-04 actualizados con inputs/outputs concretos: CA-03 usa el input de CA-02 (sepal=6.3/2.5, petal=4.9/1.5) con analistas `analista_gen` y `analista_rev`; CA-04 define la verificacion como conteo exacto de N registros antes y despues del reinicio. | Los CAs sin valores concretos no son tests — son intenciones. CA-03 y CA-04 eran los unicos CAs sin inputs/outputs deterministicos del BRD. Reusar el input de CA-02 para CA-03 es eficiente porque ese input ya genera `pendiente` por construccion (max(prob) < 0.60 con el mock). | Seccion 8.3 del BRD actualizada. El behavior.md (T0.7) puede ahora escribir escenarios Gherkin deterministicos para CA-03 y CA-04 sin inventar valores. |
 
 ---
@@ -361,4 +361,102 @@
 | :--- | :--- | :--- |
 | **L-022** | Una especificación BDD que prueba las acciones combinadas (ej. "Corregir/Confirmar") suele perder aserciones UI específicas (ej. el texto exacto del botón). Separar los "Renderizados UI" de las "Acciones de Estado" en escenarios distintos previene esta pérdida de fidelidad al BRD. | En v1.2.0, el escenario de acción de A2 olvidó testear los textos dinámicos del botón. Se corrigió en v1.3.0 separando el renderizado de la acción. |
 
+---
 
+## [2026-04-29] — CC-004: Corrección de Vacíos Críticos en BDD Contract
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documento afectado:** `docs/governance/behavior.md` (v1.3.0 → v1.4.0)
+
+---
+
+### Control de Cambios
+
+| CC-ID | Cambio | Justificacion | Ficha |
+| :--- | :--- | :--- | :--- |
+| **CC-004** | Subsanación de 5 vacíos en el BDD Contract detectados en la auditoría Devil's Advocate. | Prevenir una implementación con métricas incompletas y un esquema divergente al diccionario de datos maestro. | `docs/changes/CC-004.md` |
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-040** | Poblar `especie_confirmada` explícitamente en tests de `US-01` y `US-03`. | Sin aserción en el BDD, el campo clave para KPI-T-05 podía quedar fuera de la implementación. | Modificación de behavior.md. |
+| **D-041** | Aserción de persistencia de shadow testing debe ser por `estado = 'shadow'` y asegurar Mutabilidad Cero. | Alinear con diccionario de DB. | Elimina colisión con el SAD y blinda ORM. |
+| **D-042** | Auditoría obligatoria en `US-03` del revisor persistiendo `analista_confirmador_id`. | Garantizar gobernanza y trazabilidad de confirmaciones. | Evita registros anónimos en el sistema. |
+| **D-043** | Conversión de `RF-01b` en Scenario Outline. | Cubrir los bordes de rango para las 4 variables. | Define el marco de QA Automation para el formulario. |
+
+---
+
+### Lecciones Aprendidas
+
+| # | Leccion | Contexto |
+| :--- | :--- | :--- |
+| **L-023** | Un contrato de comportamiento es endeble si asume persistencia implícita. Cada columna que alimenta un KPI debe tener su paso asertivo en los escenarios de finalización. | En la revisión, KPI-T-05 quedaba inoperante sin las aserciones de `especie_confirmada` y `analista_confirmador_id`. |
+
+---
+
+## [2026-04-29] — CC-005: Cierre de Vacíos Lógicos y Resiliencia en BDD Contract
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documento afectado:** `docs/governance/behavior.md` (v1.4.0 → v1.5.0)
+
+---
+
+### Control de Cambios
+
+| CC-ID | Cambio | Justificacion | Ficha |
+| :--- | :--- | :--- | :--- |
+| **CC-005** | Corrección de 5 vacíos lógicos en el Contrato BDD (rangos, mutabilidad shadow, timestamps, zero-state y resiliencia control). | Prevenir implementaciones divergentes, pérdida de datos para KPIs y fallos no controlados en UI. | `docs/changes/CC-005.md` |
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-044** | Definición explícita de rangos numéricos válidos para las variables de entrada en `behavior.md`. | Evita que QA o frontend infieran rangos arbitrarios, asegurando validación determinística. | Actualización de contexto en `behavior.md`. |
+| **D-045** | Listado estricto de columnas `NULL` en escenarios shadow (`analista_id`, `decision_analista1`, `especie_analista1`, `analista_confirmador_id`, `especie_confirmada`). | Elimina ambigüedad semántica sobre "campos de interacción humana" para evitar contaminación de registros shadow. | Modificación de `behavior.md` (RF-08). |
+| **D-046** | Inclusión de aserciones de persistencia de timestamps en escenarios BDD. | Habilita el cálculo del KPI de tiempo de ciclo (ROI), requisito de negocio crítico. | Modificación de `behavior.md` (US-01, US-02, US-03). |
+| **D-047** | Especificación del comportamiento "Zero State" para cola de revisión vacía. | Previene fallos en UI (Streamlit) al agotar la cola. | Modificación de `behavior.md` (US-03). |
+| **D-048** | Creación de escenario defensivo (RF-08b) para fallo del Modelo Control. | Previene exposición de stack traces al analista y asegura limpieza en DB ante errores del motor principal. | Inclusión de RF-08b en `behavior.md`. |
+
+---
+
+## [2026-04-29] — CC-006: Refinamiento Operativo y Calidad de Ground Truth
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documentos afectados:** `docs/governance/BRD.md` (v1.8.0 → v1.9.0), `docs/governance/behavior.md` (v1.5.0 → v1.6.0)
+
+---
+
+### Control de Cambios
+
+| CC-ID | Cambio | Justificacion | Ficha |
+| :--- | :--- | :--- | :--- |
+| **CC-006** | Subsanación de 5 vacíos (Doble Submit, Estado Anulada, Atomicidad, Boundary Values, True Positive Rule). | Prevenir data basura, inconsistencias transaccionales y duplicidad transaccional. | `docs/changes/CC-006.md` |
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-049** | Crear estado `anulada` para Analista 2 | Evitar que datos basura contaminen el set Gold etiquetado obligando a clasificar algo que está mal. Excluido del KPI-T-05. | Actualización en RF-05, RF-06 y US-03. |
+| **D-050** | Bloqueo transitorio de botones en UI (Doble submit) | Impedir que un analista impaciente genere múltiples transacciones idénticas para la misma evaluación. | Nuevo Step en Gherkin (US-01 y US-03). |
+| **D-051** | Atomicidad transaccional (ROLLBACK en RF-08b) | Si el Modelo Control falla, impedir que el shadow guarde un batch huérfano. La escritura es "todo o nada". | Actualización de RF-08b en BDD y BRD. |
+| **D-052** | Boundary values exactos en BDD para validación de forma | Especificar explícitamente valores decimales de borde (`8.01`) | Mejora de RF-01b. |
+| **D-053** | Corrección del A2 devolviendo la predicción del modelo se cuenta como True Positive | La métrica real del modelo se compara frente a `especie_confirmada`. Si A1 rechazó por error y A2 restauró el valor, el modelo acertó. | Aclaración explícita en KPI-T-05 y US-03. |
+
+---
+
+### Lecciones Aprendidas
+
+| # | Leccion | Contexto |
+| :--- | :--- | :--- |
+| **L-024** | Una métrica "justa" para IA requiere contemplar el error humano en dos vías. A1 puede equivocarse "castigando" al modelo, y la UI debe permitir que A2 "repare" este castigo sin que quede fuera de la contabilización del ROI. | En revisión previa no había claridad de que "Corregir" pudiera dar la razón a la IA original. |
+| **L-025** | En shadow testing, el flujo transaccional debe ser atómico para todo el batch de modelos. Ejecutar sin bloque try-except+ROLLBACK es la vía rápida a los registros huérfanos. | Detectado al examinar la posible des-sincronización entre Control (crash) y Tratamiento (ok). |

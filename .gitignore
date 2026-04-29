@@ -45,3 +45,6 @@ models/*
 # OS
 .DS_Store
 Thumbs.db
+
+# Local Settings
+.claude/settings.local.json
