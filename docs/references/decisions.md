@@ -199,3 +199,88 @@
 | **L-010** | El paradigma de Torneo de Algoritmos requiere que el Efficiency Gate preceda a cualquier evaluacion de precision. Evaluar precision de un modelo que no puede operar en el hardware objetivo es trabajo desperdiciado. La arquitectura de agentes debe reflejar este orden de filtros explicitamente. | Al disenar el `algorithm-architecture-evaluator`, el orden natural era evaluar precision primero y luego verificar recursos. Invertir este orden (Efficiency Gate primero) es contraintuitivo pero correcto: evita optimizar hiperparametros de candidatos que nunca llegaran a produccion. |
 | **L-011** | La captura temprana de la intencion de Shadow Testing en la Fase 0 es mas barata que un CC en la Fase de Modelado. Un requisito de Shadow Testing descubierto cuando ya existe un unico modelo entrenado obliga a redisenar la arquitectura de gestion de modelos y el esquema de persistencia. | La sesion anterior (CC-002) incorporo Shadow Testing al BRD despues de que ya estaba redactado. Aunque el CC fue exitoso, el costo hubiera sido mayor si se detectaba en la Fase de Ingesta o Modelado. La Hard Rule #6 previene que esto se repita en proyectos futuros. |
 | **L-012** | Los skills de un agente deben diferenciarse por el rol del artefacto que producen, no solo por la tecnica que aplican. SHAP se aplica igual a Control y a Tratamiento, pero el artefacto de salida (tabla comparativa + alerta de divergencia) tiene valor distinto para el Product Owner que SHAP de un modelo aislado. El diseño de skills debe explicitar este contexto de uso. | Al actualizar el `feature-importance-analyzer`, la primera version del skill simplemente doblaba el analisis SHAP. La version final agrega la tabla comparativa y la señal de alerta, que son los entregables con valor real para la decision de promocion de modelo. |
+
+---
+
+## [2026-04-29] — Auditoria Devil's Advocate BRD v1.5.0 → v1.6.0 (7 micro-decisiones)
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documento afectado:** `docs/governance/BRD.md` (v1.5.0 → v1.6.0)
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-019** | Al rechazar la prediccion, el selector de especie excluye la especie predicha por el modelo control (G-001) | El rechazo debe implicar una alternativa real. Permitir rechazar eligiendo la misma especie generaria un registro semanticamente contradictorio (`decision_analista1=rechazada`, `especie_analista1=especie_predicha`). Si el A1 quiere revision sin cambiar la especie, el mecanismo correcto es la advertencia de baja confianza. | RF-04 actualizado. El SpecDD debe reflejar que el selector de especie en el flujo de rechazo filtra la especie predicha del modelo control. |
+| **D-020** | "Corregir" del Analista 2 permite elegir cualquier especie, incluida la del modelo control (G-002) | El A2 discrepa del criterio del A1, no del modelo. Si el modelo tenia razon y el A1 se equivoco al rechazar, el A2 debe poder restaurar la especie del modelo. Restringir la eleccion del A2 a "distinta del modelo y del A1" bloquearia este caso valido. | RF-05 actualizado. El SpecDD debe reflejar que el selector del A2 en "Corregir" muestra las 3 especies sin filtro. |
+| **D-021** | La vista enriquecida del A2 muestra el origen del estado pendiente: `baja_confianza_automatica` vs `rechazo_analista1` (G-003) | Sin este indicador, el A2 no puede distinguir si el caso esta en revision porque el modelo es incierto o porque el A1 discrepo. Son dos situaciones con interpretacion distinta. El campo `baja_confianza` (bool) ya existe en SQLite; solo requiere ser expuesto en la UI. | RF-05 actualizado. El SpecDD y el SAD deben incluir la logica de derivacion del indicador: `baja_confianza=True` → `baja_confianza_automatica`; `baja_confianza=False` y `decision_analista1=rechazada` → `rechazo_analista1`. |
+| **D-022** | KPI-T-05 ground truth simplificado a `especie_confirmada` para todos los estados terminales (A-001/I-002) | La logica condicional anterior (`confirmada_a1` → especie predicha; `confirmada` → `especie_analista1`; `corregida` → `especie_confirmada`) generaba NULL para registros `confirmada` donde el A1 acepto. `especie_confirmada` es siempre deterministica en estados terminales y elimina la logica condicional del calculo del KPI. | KPI-T-05 actualizado. El SpecDD del modulo de evaluacion offline debe leer `especie_confirmada` directamente, sin condicionales por estado. |
+| **D-023** | Dominio completo del campo `estado` en SQLite: `pendiente / confirmada_a1 / confirmada / corregida / shadow` (A-003/I-001) | El campo en RF-06 solo listaba 3 valores; los estados `confirmada_a1` (CC-003) y `shadow` (CC-002) habian sido introducidos en el BRD pero no reflejados en la definicion del campo de persistencia. La inconsistencia hubiera generado un esquema SQLite defectuoso. | RF-06 actualizado. El Contrato de Datos (T0.12) debe usar este dominio completo como restriccion CHECK en la columna. |
+| **D-024** | Campo `prediction_batch_id` (UUID) agregado al esquema SQLite como 21er campo; compartido entre registro control y shadow del mismo ciclo de prediccion (CB-004) | Sin este campo, el join para KPI-T-05 dependia de `(timestamp, analista_id)` con tolerancia de segundos, lo cual es fragil. Un UUID generado en el dispatcher al invocar ambos modelos garantiza un join exacto y sin ambiguedad. | RF-06 actualizado (21 campos). RF-08 actualizado (el dispatcher genera el UUID). El Contrato de Datos (T0.12) debe incluir este campo. El SpecDD debe definir que el dispatcher de predicciones genera el `prediction_batch_id` antes de invocar ambos modelos. |
+| **D-025** | RF-08 distingue dos estados del modelo tratamiento: "no configurado" (operacion silenciosa) vs "fallo en runtime" (log interno, continua solo con control, no escribe registro shadow) (A-004) | La distincion importa para el implementador del dispatcher: "no configurado" es un estado esperado de operacion (antes del primer despliegue del tratamiento), mientras que "fallo en runtime" es un error que debe ser observable internamente sin impactar al analista. Tratarlos igual ocultaria errores operativos reales. | RF-08 actualizado. El SpecDD debe definir la interfaz del dispatcher con los dos modos de degradacion. El SAD debe incluir la estrategia de logging para fallos de runtime del modelo tratamiento. |
+
+---
+
+### Lecciones Aprendidas
+
+| # | Leccion | Contexto |
+| :--- | :--- | :--- |
+| **L-013** | Una auditoria devil's advocate del BRD inmediatamente antes de redactar behavior.md es el momento de maxima eficiencia: los hallazgos se resuelven como micro-decisiones (sin CC formal) porque aun no hay escenarios Gherkin ni tests escritos que deban actualizarse en cascada. El costo de resolver un vacio en el BRD crece exponencialmente con cada capa de artefacto que lo hereda. | Los 7 hallazgos de prioridad Alta de esta auditoria hubieran generado escenarios Gherkin ambiguos, un esquema SQLite defectuoso y un KPI-T-05 con ground truth NULL. Detectarlos antes de T0.7 redujo el costo de correccion a ediciones puntuales en un solo documento. |
+| **L-014** | El campo `prediction_batch_id` es un ejemplo de infraestructura de datos que solo se identifica al razonar sobre el calculo de un KPI concreto. Si el KPI-T-05 no hubiera sido definido con precision desde el BRD, la necesidad del UUID de correlacion no habria emergido hasta la fase de implementacion del modulo de evaluacion offline, cuando el esquema SQLite ya estaria fijo. | CB-004 fue identificado por el agente al cruzar la definicion de KPI-T-05 con la logica de escritura de registros shadow. El BRD debe especificar KPIs con suficiente precision para que los campos de soporte necesarios emerjan en la fase de gobernanza, no en la de implementacion. |
+
+---
+
+## [2026-04-29] — Auditoria Devil's Advocate BRD v1.6.0 → v1.7.0 (5 micro-decisiones)
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documento afectado:** `docs/governance/BRD.md` (v1.6.0 → v1.7.0)
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-026** | Cola de pendientes con filtrado tecnico: la consulta SQLite aplica `WHERE estado = 'pendiente' AND analista_id != [analista_id_sesion]`. El analista no ve sus propios casos. | Aunque D-008 establece que la auto-confirmacion no se bloquea tecnicamente, ocultar los casos propios en la cola reduce la friccion de confusion ("por que aparece mi caso aqui") sin requerir autenticacion. Es consistente con D-008 porque el bloqueo de escritura sigue siendo organizacional; solo se filtra la vista de lectura. | RF-05 actualizado. El SpecDD debe definir la consulta de la cola como parametrizada con `analista_id_sesion`. El SpecDD de la capa de persistencia debe reflejar este patron de consulta. |
+| **D-027** | El label del boton "Confirmar" del A2 se renderiza de forma diferenciada segun el origen de la especie: "Confirmar especie del Analista 1: [X]" cuando `especie_analista1` tiene valor; "Confirmar especie del modelo: [X]" cuando `especie_analista1` es NULL. | Sin esta diferenciacion, el A2 no sabe si esta confirmando una decision humana o una prediccion del modelo. Son dos actos con distinto peso semantico. Hacerlo explicito en el label elimina ambiguedad sin agregar complejidad de implementacion. | RF-05 actualizado. El SpecDD de la capa UI debe definir la logica de renderizado del label como una funcion determinista sobre `especie_analista1`. El behavior.md (T0.7) debe incluir un escenario Gherkin para cada caso del label. |
+| **D-028** | Tras la decision del A2 (Confirmar o Corregir), el sistema muestra un mensaje de confirmacion ("Caso cerrado correctamente") y el A2 permanece en la vista de cola con los casos restantes. El caso cerrado solo es accesible desde la vista de historial. | Un regreso silencioso sin mensaje deja al A2 sin feedback de que su accion fue registrada. El mensaje de confirmacion es el minimo necesario para cerrar el ciclo de interaccion. Permanecer en la cola (en lugar de redirigir a otra vista) es la opcion de menor friccion para analistas que procesan multiples casos en una sesion. | RF-05 actualizado. El SpecDD y el behavior.md deben incluir el estado post-accion del A2 como parte del escenario de US-03. |
+| **D-029** | `prediction_batch_id` se genera y almacena en el registro del modelo control en todos los ciclos de prediccion, independientemente de si el modelo tratamiento esta configurado. Cuando no hay registro shadow, el UUID queda sin par — esto es esperado y no es un error. | Generar el UUID siempre simplifica el dispatcher (no necesita condicionales sobre la disponibilidad del tratamiento para decidir si genera el UUID). Ademas, permite que si el tratamiento se configura posteriormente, los registros de control anteriores ya tengan UUID y sean elegibles para futuros calculos de KPI-T-05 si el ground truth esta disponible. | RF-06 actualizado (`prediction_batch_id`). RF-08 actualizado (el dispatcher genera el UUID antes de cualquier invocacion a los modelos). El SpecDD debe reflejar este orden de operaciones en el dispatcher. |
+| **D-030** | CA-03 y CA-04 actualizados con inputs/outputs concretos: CA-03 usa el input de CA-02 (sepal=6.3/2.5, petal=4.9/1.5) con analistas `analista_gen` y `analista_rev`; CA-04 define la verificacion como conteo exacto de N registros antes y despues del reinicio. | Los CAs sin valores concretos no son tests — son intenciones. CA-03 y CA-04 eran los unicos CAs sin inputs/outputs deterministicos del BRD. Reusar el input de CA-02 para CA-03 es eficiente porque ese input ya genera `pendiente` por construccion (max(prob) < 0.60 con el mock). | Seccion 8.3 del BRD actualizada. El behavior.md (T0.7) puede ahora escribir escenarios Gherkin deterministicos para CA-03 y CA-04 sin inventar valores. |
+
+---
+
+### Lecciones Aprendidas
+
+| # | Leccion | Contexto |
+| :--- | :--- | :--- |
+| **L-015** | Una segunda auditoria del mismo BRD, ejecutada con ojos de implementador de behavior.md, detecta vacios de UX y flujo de navegacion que la primera auditoria (orientada a consistencia logica) no ve. Los dos tipos de auditoria son complementarios, no redundantes. | La primera auditoria (v1.5.0 → v1.6.0) se enfoco en inconsistencias de datos y logica de negocio. La segunda (v1.6.0 → v1.7.0) encontro vacios de renderizado de UI, flujo post-accion y comportamiento de campos en casos limite — vacios que solo se detectan al intentar escribir un escenario Gherkin concreto. |
+| **L-016** | El filtrado tecnico de la cola de pendientes (D-026) es un caso donde la interfaz de la UI (que oculta casos propios) diverge del modelo de datos (que no tiene restriccion de escritura). Documentar esta divergencia explicitamente en el BRD previene que el implementador asuma que el filtro de lectura implica un bloqueo de escritura, o viceversa. | Sin D-026, un implementador podria razonablemente implementar el filtro de lectura Y agregar validacion de escritura (sobre-ingenieria), o no implementar el filtro de lectura porque D-008 dice que no hay bloqueo tecnico (sub-implementacion). La decision explicita elimina ambas interpretaciones erroneas. |
+
+---
+
+## [2026-04-29] — Auditoria Devil's Advocate BRD v1.7.0 → v1.8.0 (3 micro-decisiones)
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documento afectado:** `docs/governance/BRD.md` (v1.7.0 → v1.8.0)
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-031** | Mock canonico de CA-02a: `prob=[setosa=0.45, versicolor=0.30, virginica=0.25]` → especie predicha `setosa` (max(prob)=0.45). El orden de clases sigue el orden alfabetico de scikit-learn: setosa=0, versicolor=1, virginica=2. `especie_analista1 = NULL` cuando el A1 acepta (alta o baja confianza); `especie_analista1 = especie elegida` cuando el A1 rechaza. | Sin el mapping explicito, el paso `Entonces la especie predicha es "[X]"` del escenario Gherkin de CA-02a no es determinista: dos implementadores pueden asumir ordenes distintos de clases y producir tests divergentes sin error de logica. El orden alfabetico de scikit-learn es la convencion canonica del stack (RNF-01). | CA-02a en seccion 8.3 actualizada con mock canonico. RF-04 actualizado con tabla de 4 caminos del A1 y valor de `especie_analista1` por camino. behavior.md (T0.7) puede escribir escenarios Gherkin deterministas para los 4 caminos del A1. |
+| **D-032** | CA-03 fijada: el A1 acepta la prediccion de baja confianza (`decision_analista1=aceptada`, `especie_analista1=NULL`). El origen del pendiente en la cola es `baja_confianza_automatica`. Los campos visibles para `analista_rev` incluyen: especie predicha (`setosa`), probabilidades, origen (`baja_confianza_automatica`), decision del A1 (`aceptada`), `especie_analista1` (NULL), `analista_id` del generador (`analista_gen`). | CA-03 no declaraba la decision del A1, por lo que el campo `origen` tenia dos valores posibles (`baja_confianza_automatica` o `baja_confianza_automatica + rechazo_analista1`) dependiendo de una precondicion no fijada. Fijar la decision del A1 como `aceptada` produce el escenario mas simple, cubre el trigger automatico puro, y permite que el escenario `baja_confianza + rechazo` se documente como CA-03b en behavior.md si se requiere cobertura adicional. | CA-03 en seccion 8.3 actualizada con todos los valores concretos. El behavior.md (T0.7) puede escribir un escenario Gherkin completamente determinista para CA-03. |
+
+---
+
+### Lecciones Aprendidas
+
+| # | Leccion | Contexto |
+| :--- | :--- | :--- |
+| **L-017** | Una tercera ronda de auditoria del BRD, ejecutada con ojo de implementador de tests Gherkin, detecta vacios de contrato de datos que las auditorias previas no ven: especificamente, la ausencia de mapping entre vectores de probabilidad y nombres de clase, y la ausencia de valores NULL vs. vacio en columnas opcionales. Estos vacios son invisibles desde la perspectiva de negocio pero bloquean la escritura de steps `Entonces` deterministas. | Los hallazgos A3-H01 y A3-H02 son de naturaleza tecnica (contrato de columna SQLite, orden canonico de clases), no de negocio. Solo emergen cuando se intenta traducir el BRD a un escenario Gherkin con valores concretos en todos los pasos. La auditoria con perspectiva de implementador de tests es complementaria a la auditoria de consistencia logica y a la auditoria de UX/flujo. |

@@ -2,15 +2,15 @@
 
 > Documento de continuidad. Un agente nuevo debe poder retomar el trabajo leyendo solo este archivo.
 
-- **Fecha de cierre:** 2026-04-28
+- **Fecha de cierre:** 2026-04-29
 - **Rama activa:** `slice/F0-backlog-init`
 - **Fase:** Phase Discovery
 - **Iteracion:** 0.0 — Setup y Gobernanza Inicial
-- **Progreso de iteracion:** 65% (sesion de gobernanza de agentes: Torneo de Algoritmos + Shadow Testing)
+- **Progreso de iteracion:** 85% (BRD v1.8.0 cerrado — tercera auditoria devil's advocate completada, 3 micro-decisiones resueltas; T0.7 habilitada sin vacios bloqueantes)
 
 ---
 
-## Logros de la sesion
+## Logros de la sesion (actualizacion 2026-04-29)
 
 | Tarea | Entregable | Estado |
 | :--- | :--- | :--- |
@@ -20,6 +20,9 @@
 | **Skill actualizado** | `.claude/skills/hyperparameter-optimization-expert/SKILL.md` — Optimizacion diferenciada por rol (Control vs. Tratamiento), estudios Optuna separados | Completada |
 | **Skill actualizado** | `.claude/skills/feature-importance-analyzer/SKILL.md` — SHAP y Permutation Importance aplicados a ambos modelos, tabla comparativa, alerta de divergencia SHAP | Completada |
 | **Agente actualizado** | `.claude/agents/ai-business-strategist.md` — Hard Rule #6 Shadow Test Intent incorporada | Completada |
+| **BRD v1.6.0** | `docs/governance/BRD.md` — 7 micro-decisiones post-auditoria aplicadas; esquema SQLite expandido a 21 campos (`prediction_batch_id`); KPI-T-05 simplificado; dominio `estado` completo; RF-08 con distincion de modos de fallo | Completada |
+| **BRD v1.7.0** | `docs/governance/BRD.md` — segunda auditoria devil's advocate; 5 micro-decisiones (D-026 a D-030): filtrado tecnico de cola, label UI A2, flujo post-accion A2, prediction_batch_id sin par, CA-03/CA-04 con valores concretos | Completada |
+| **BRD v1.8.0** | `docs/governance/BRD.md` — tercera auditoria devil's advocate (perspectiva implementador Gherkin); 2 micro-decisiones (D-031, D-032): mock canonico CA-02a con mapping de clases, tabla de valores de especie_analista1 por camino del A1, CA-03 con decision del A1 fijada | Completada |
 
 ### Detalle de la sesion
 
@@ -51,7 +54,7 @@
 | **T0.12** | Creacion del Contrato de Datos | `ai-solutions-architect` | T0.10 |
 | **Pendiente opcional** | Ajustar `docs/Phase_discovery/BRD.md` para incorporar seccion de Estrategia de Despliegue con Shadow Testing si aplica al proyecto Flores_CD | `ai-business-strategist` | BRD v1.5.0, decision del cliente |
 
-**Tarea #1 para la proxima sesion:** T0.7 — Redactar `docs/governance/behavior.md`. El agente `ai-business-strategist` debe usar el BRD v1.5.0 como unica fuente de verdad y cubrir los siguientes caminos:
+**Tarea #1 para la proxima sesion:** T0.7 — Redactar `docs/governance/behavior.md`. El agente `ai-business-strategist` debe usar el BRD v1.8.0 como unica fuente de verdad y cubrir los siguientes caminos:
 - 4 caminos para el mecanismo Aceptar/Rechazar del Analista 1: alta confianza + acepta, alta confianza + rechaza, baja confianza + acepta, baja confianza + rechaza.
 - Escenarios de shadow testing: ejecucion invisible del modelo tratamiento, almacenamiento con `is_shadow=True`, ausencia de exposicion al analista.
 - CA-02a y CA-02b del BRD siguen vigentes (CA-02a testeable con mock; CA-02b requiere modelo entrenado, se redacta como placeholder).
@@ -66,7 +69,7 @@ Ninguno. El BRD v1.5.0 esta aprobado y el escuadron de agentes esta alineado con
 
 ## Contexto critico para retomar
 
-1. **BRD v1.5.0** (`docs/governance/BRD.md`) es la unica fuente de verdad vigente. Versiones anteriores quedan obsoletas.
+1. **BRD v1.8.0** (`docs/governance/BRD.md`) es la unica fuente de verdad vigente. Versiones anteriores quedan obsoletas.
 2. **Maquina de estados completa (5 transiciones):**
    - Alta confianza + A1 acepta → `confirmada_a1` (caso cerrado, sin Analista 2)
    - Baja confianza + cualquier decision A1 → `pendiente`
@@ -74,7 +77,7 @@ Ninguno. El BRD v1.5.0 esta aprobado y el escuadron de agentes esta alineado con
    - Analista 2 confirma → `confirmada`
    - Analista 2 corrige → `corregida`
 3. **Shadow testing completamente invisible para los analistas.** Ambos modelos ejecutan en paralelo; solo el control es visible. El tratamiento tiene estado fijo `shadow`.
-4. **Esquema SQLite: 20 campos.** Los 3 campos de CC-003 (`decision_analista1`, `especie_analista1`, `timestamp_decision_analista1`) son nulos para registros shadow.
+4. **Esquema SQLite: 21 campos.** Los 3 campos de CC-003 (`decision_analista1`, `especie_analista1`, `timestamp_decision_analista1`) son nulos para registros shadow. El campo `prediction_batch_id` (UUID) es compartido entre el registro control y el shadow del mismo ciclo — es el mecanismo de join para KPI-T-05.
 5. **KPI-T-05:** Ground truth construido desde el veredicto final del flujo operativo, no desde etiquetas externas.
 6. **behavior.md debe cubrir 4 caminos para el mecanismo A1** ademas de escenarios de shadow testing. CA-02a y CA-02b del BRD siguen vigentes.
 7. **CA-02 dividida en CA-02a y CA-02b.** CA-02a usa mock de modelo con prob=[0.45, 0.30, 0.25] → activa advertencia de baja confianza. CA-02b es el test con input real post-entrenamiento.
@@ -95,6 +98,8 @@ Ninguno. El BRD v1.5.0 esta aprobado y el escuadron de agentes esta alineado con
   - `.claude/skills/hyperparameter-optimization-expert/SKILL.md` — MODIFICADO (optimizacion diferenciada por rol)
   - `.claude/skills/feature-importance-analyzer/SKILL.md` — MODIFICADO (SHAP dual model, alerta divergencia)
   - `.claude/agents/ai-business-strategist.md` — MODIFICADO (Hard Rule #6 Shadow Test Intent)
-  - `docs/references/decisions.md` — ACTUALIZADO (D-016 a D-018 registrados)
+  - `docs/references/decisions.md` — ACTUALIZADO (D-016 a D-025 registrados)
+  - `docs/governance/BRD.md` — ACTUALIZADO (v1.5.0 → v1.6.0 → v1.7.0 → v1.8.0, 14 micro-decisiones acumuladas)
+  - `docs/references/decisions.md` — ACTUALIZADO (D-026 a D-030 registrados)
   - `docs/references/handoff.md` — ACTUALIZADO (este archivo)
 - Pendiente de commit y merge a rama de iteracion: a cargo del `ai-repository-governor`
