@@ -6,7 +6,7 @@
 - **Rama activa:** `slice/F0-backlog-init`
 - **Fase:** Phase Discovery
 - **Iteracion:** 0.0 — Setup y Gobernanza Inicial
-- **Progreso de iteracion:** 58% (sin nuevas tareas completadas — sesion de gobernanza y CC)
+- **Progreso de iteracion:** 65% (sesion de gobernanza de agentes: Torneo de Algoritmos + Shadow Testing)
 
 ---
 
@@ -14,30 +14,28 @@
 
 | Tarea | Entregable | Estado |
 | :--- | :--- | :--- |
-| **CC-002 ejecutado** | BRD v1.3.0 → v1.4.0: shadow testing incorporado (RF-08 nuevo, RF-02/RF-05/RF-06 expandidos, KPI-T-05 nuevo, Seccion 11.2) | Completada |
-| **CC-003 ejecutado** | BRD v1.4.0 → v1.5.0: mecanismo Aceptar/Rechazar del Analista 1 incorporado (RF-04/RF-05 expandidos, RF-06 ampliado a 20 campos, KPI-T-05 actualizado) | Completada |
-| **BRD v1.5.0 aprobado** | `docs/governance/BRD.md` — version vigente | Completada |
-| **docs/changes/CC-002.md** | Ficha formal de CC-002 creada | Completada |
-| **docs/changes/CC-003.md** | Ficha formal de CC-003 creada | Completada |
-| **decisions.md actualizado** | D-012 a D-015 registrados | Completada |
+| **Agentes actualizados (x6)** | `.claude/agents/ai-data-scientist.md` — Nuevos triggers, mision operativa reescrita, 3 nuevas Reglas de Oro | Completada |
+| **Skill actualizado** | `.claude/skills/algorithm-architecture-evaluator/SKILL.md` — Filtro de Eficiencia, Round Robin con CV std, Seleccion Dual con artefacto YAML | Completada |
+| **Skill actualizado** | `.claude/skills/baseline-model-developer/SKILL.md` — Baseline como Modelo Control, Challenger como Tratamiento, preparacion del Shadow Test | Completada |
+| **Skill actualizado** | `.claude/skills/hyperparameter-optimization-expert/SKILL.md` — Optimizacion diferenciada por rol (Control vs. Tratamiento), estudios Optuna separados | Completada |
+| **Skill actualizado** | `.claude/skills/feature-importance-analyzer/SKILL.md` — SHAP y Permutation Importance aplicados a ambos modelos, tabla comparativa, alerta de divergencia SHAP | Completada |
+| **Agente actualizado** | `.claude/agents/ai-business-strategist.md` — Hard Rule #6 Shadow Test Intent incorporada | Completada |
 
 ### Detalle de la sesion
 
-**CC-002 — Shadow Testing:**
-- El cliente exigio shadow testing. Aprobado y ejecutado.
-- RF-08 (nuevo): modelo tratamiento opera en sombra, almacena predicciones con `model_role=tratamiento` e `is_shadow=True`, invisible para los analistas.
-- RF-02: nota aclaratoria — prediccion visible = modelo control.
-- RF-05: estados `pendiente/confirmada/corregida` solo para modelo control. Tratamiento tiene estado fijo `shadow`.
-- RF-06: esquema SQLite de 14 → 17 campos (+`model_id`, +`model_role`, +`is_shadow`).
-- KPI-T-05 (nuevo): divergencia de prediccion control vs. tratamiento.
-- Seccion 11.2: alcance incluido/excluido del shadow testing.
+**Paradigma de Torneo de Algoritmos:**
+- El escuadrón de agentes ahora soporta el flujo completo: Torneo → Filtro de Eficiencia → Seleccion Dual (Control/Tratamiento) → Shadow Test.
+- El Modelo Control se selecciona por estabilidad (minimo CV std). El Modelo Tratamiento se selecciona por maxima precision, con el Efficiency Gate como filtro previo no negociable.
+- El artefacto de salida del torneo es un YAML con `control_model` y `treatment_model` como campos diferenciados.
 
-**CC-003 — Mecanismo Aceptar/Rechazar del Analista 1:**
-- Vacio identificado: sin mecanismo de rechazo, los Falsos Positivos de alta confianza no tenian cobertura. Aprobado y ejecutado.
-- RF-04 (expandido): tras cada clasificacion, el Analista 1 ve dos botones "Aceptar" y "Rechazar". Si rechaza, selecciona la especie que considera correcta. Nuevo estado `confirmada_a1` para alta confianza aceptada.
-- RF-05 (expandido): maquina de estados con 5 transiciones. Vista enriquecida para Analista 2 muestra `especie_analista1`.
-- RF-06: esquema SQLite de 17 → 20 campos (+`decision_analista1`, +`especie_analista1`, +`timestamp_decision_analista1`).
-- KPI-T-05 (actualizado): ground truth definido por estado — `confirmada_a1` → especie del modelo; `confirmada` → `especie_analista1`; `corregida` → `especie_confirmada`.
+**Efficiency Gate:**
+- Candidatos al torneo son eliminados ANTES de evaluar precision si superan los limites de train time, latencia de inferencia o uso de memoria.
+- Este filtro hace al sistema compatible con el hardware del cliente (Streamlit local, PC compartida).
+
+**Rol del ai-business-strategist en Shadow Testing:**
+- La Hard Rule #6 obliga al estratega a preguntar explicitamente sobre Shadow Testing durante el ritual ask-me de la Fase 0.
+- Las preguntas de seguimiento cubren: quien aprueba el paso a produccion y cuales son los criterios de aceptacion del tratamiento.
+- Esto centraliza la captura de la intencion de Shadow Testing en la Fase de Descubrimiento, evitando que se descubra tardıamente como un requisito no documentado.
 
 ---
 
@@ -51,6 +49,7 @@
 | **T0.10** | Diseno de Arquitectura de Software (SAD) | `ai-solutions-architect` | T0.6 resuelta, T0.7 |
 | **T0.11** | Especificacion de Interfaces (SpecDD) | `ai-solutions-architect` | T0.10 |
 | **T0.12** | Creacion del Contrato de Datos | `ai-solutions-architect` | T0.10 |
+| **Pendiente opcional** | Ajustar `docs/Phase_discovery/BRD.md` para incorporar seccion de Estrategia de Despliegue con Shadow Testing si aplica al proyecto Flores_CD | `ai-business-strategist` | BRD v1.5.0, decision del cliente |
 
 **Tarea #1 para la proxima sesion:** T0.7 — Redactar `docs/governance/behavior.md`. El agente `ai-business-strategist` debe usar el BRD v1.5.0 como unica fuente de verdad y cubrir los siguientes caminos:
 - 4 caminos para el mecanismo Aceptar/Rechazar del Analista 1: alta confianza + acepta, alta confianza + rechaza, baja confianza + acepta, baja confianza + rechaza.
@@ -61,13 +60,13 @@
 
 ## Bloqueadores activos
 
-Ninguno. El BRD v1.5.0 esta aprobado y es suficiente para iniciar behavior.md.
+Ninguno. El BRD v1.5.0 esta aprobado y el escuadron de agentes esta alineado con el paradigma de Torneo + Shadow Testing.
 
 ---
 
 ## Contexto critico para retomar
 
-1. **BRD v1.5.0** (`docs/governance/BRD.md`) es la unica fuente de verdad vigente. Versiones anteriores (v1.3.0, v1.4.0) quedan obsoletas.
+1. **BRD v1.5.0** (`docs/governance/BRD.md`) es la unica fuente de verdad vigente. Versiones anteriores quedan obsoletas.
 2. **Maquina de estados completa (5 transiciones):**
    - Alta confianza + A1 acepta → `confirmada_a1` (caso cerrado, sin Analista 2)
    - Baja confianza + cualquier decision A1 → `pendiente`
@@ -76,12 +75,13 @@ Ninguno. El BRD v1.5.0 esta aprobado y es suficiente para iniciar behavior.md.
    - Analista 2 corrige → `corregida`
 3. **Shadow testing completamente invisible para los analistas.** Ambos modelos ejecutan en paralelo; solo el control es visible. El tratamiento tiene estado fijo `shadow`.
 4. **Esquema SQLite: 20 campos.** Los 3 campos de CC-003 (`decision_analista1`, `especie_analista1`, `timestamp_decision_analista1`) son nulos para registros shadow.
-5. **KPI-T-05:** Ground truth construido desde el veredicto final del flujo operativo, no desde etiquetas externas. Esto elimina la necesidad de un conjunto de test separado para evaluar los modelos en produccion.
+5. **KPI-T-05:** Ground truth construido desde el veredicto final del flujo operativo, no desde etiquetas externas.
 6. **behavior.md debe cubrir 4 caminos para el mecanismo A1** ademas de escenarios de shadow testing. CA-02a y CA-02b del BRD siguen vigentes.
-7. **CA-02 dividida en CA-02a y CA-02b.** CA-02a usa mock de modelo con prob=[0.45, 0.30, 0.25] → activa advertencia de baja confianza. CA-02b es el test con input real post-entrenamiento y se completa en anexo de calibracion.
+7. **CA-02 dividida en CA-02a y CA-02b.** CA-02a usa mock de modelo con prob=[0.45, 0.30, 0.25] → activa advertencia de baja confianza. CA-02b es el test con input real post-entrenamiento.
 8. **Umbral de baja confianza 0.60:** calibrable post-entrenamiento. Criterio: ≤15% de predicciones del test set de Iris deben activar la advertencia.
-9. **Control de auto-confirmacion:** organizacional, no tecnico. El sistema NO bloquea que un analista confirme su propia prediccion.
-10. El `config.md` es la fuente de verdad para IDs externos (NotebookLM ID: `7169f5cf-1c59-43ea-aa59-56d5e9f1dff3`, GitHub: `https://github.com/jdrodriguez1000/Flores_CD`).
+9. **Modelo Control = estabilidad (minimo CV std). Modelo Tratamiento = maxima precision.** El Efficiency Gate se aplica a todos los candidatos antes de evaluar precision.
+10. **El ai-business-strategist es el punto de captura de la intencion de Shadow Testing (Fase 0)**, no el ai-data-scientist. La Hard Rule #6 lo formaliza.
+11. El `config.md` es la fuente de verdad para IDs externos (NotebookLM ID: `7169f5cf-1c59-43ea-aa59-56d5e9f1dff3`, GitHub: `https://github.com/jdrodriguez1000/Flores_CD`).
 
 ---
 
@@ -89,9 +89,12 @@ Ninguno. El BRD v1.5.0 esta aprobado y es suficiente para iniciar behavior.md.
 
 - Rama activa: `slice/F0-backlog-init`
 - Archivos modificados/creados en esta sesion:
-  - `docs/governance/BRD.md` — MODIFICADO (v1.3.0 → v1.5.0, 2 CC aplicados)
-  - `docs/changes/CC-002.md` — CREADO
-  - `docs/changes/CC-003.md` — CREADO
-  - `docs/references/decisions.md` — ACTUALIZADO (D-012 a D-015 registrados)
+  - `.claude/agents/ai-data-scientist.md` — MODIFICADO (Torneo, Efficiency Gate, Reglas de Oro nuevas)
+  - `.claude/skills/algorithm-architecture-evaluator/SKILL.md` — MODIFICADO (Secciones II-IV reescritas)
+  - `.claude/skills/baseline-model-developer/SKILL.md` — MODIFICADO (Control/Tratamiento/Shadow Test)
+  - `.claude/skills/hyperparameter-optimization-expert/SKILL.md` — MODIFICADO (optimizacion diferenciada por rol)
+  - `.claude/skills/feature-importance-analyzer/SKILL.md` — MODIFICADO (SHAP dual model, alerta divergencia)
+  - `.claude/agents/ai-business-strategist.md` — MODIFICADO (Hard Rule #6 Shadow Test Intent)
+  - `docs/references/decisions.md` — ACTUALIZADO (D-016 a D-018 registrados)
   - `docs/references/handoff.md` — ACTUALIZADO (este archivo)
 - Pendiente de commit y merge a rama de iteracion: a cargo del `ai-repository-governor`

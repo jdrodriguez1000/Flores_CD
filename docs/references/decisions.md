@@ -171,3 +171,31 @@
 | ID | Decision | Justificacion | Impacto |
 | :--- | :--- | :--- | :--- |
 | **D-015** | El Analista 1 debe emitir siempre una decision explicita (Aceptar/Rechazar) tras cada clasificacion. Alta confianza + Aceptar = `confirmada_a1` (caso cerrado). Cualquier Rechazo o Baja confianza = `pendiente` (va a revision). | Cierra el gap del Falso Positivo de alta confianza y genera ground truth operativo para el shadow test sin infraestructura adicional. | RF-04 y RF-05 del BRD reflejan la maquina de estados completa. El SpecDD (T0.11) debe definir la interfaz del dispatcher con el parametro de decision del Analista 1. behavior.md (T0.7) debe incluir escenarios Gherkin para los cuatro caminos: alta confianza + acepta, alta confianza + rechaza, baja confianza + acepta, baja confianza + rechaza. |
+
+---
+
+## [2026-04-28] — Sesion de Cierre: Phase Discovery / Iteracion 0.0 — Gobernanza de Agentes: Torneo de Algoritmos y Shadow Testing
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente de cierre:** `ai-session-steward`
+- **Archivos modificados:** 6 archivos del escuadron (2 agentes, 4 skills)
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-016** | El Modelo Control se selecciona por minimo CV std (estabilidad) y el Modelo Tratamiento por maxima precision, con el Efficiency Gate como filtro previo no negociable para todos los candidatos | La estabilidad del Control garantiza que el flujo operativo del analista no se vea afectado por varianza de prediccion. El Tratamiento puede optimizar precision pura porque opera en sombra sin impacto visible. El Efficiency Gate es no negociable porque el hardware del cliente (PC compartida, Streamlit local) impone restricciones reales de recursos. | El `algorithm-architecture-evaluator` aplica el Efficiency Gate antes de evaluar precision. El `hyperparameter-optimization-expert` tiene dos estudios Optuna separados con objetivos distintos por rol. El artefacto YAML de salida del torneo diferencia `control_model` y `treatment_model`. |
+| **D-017** | El `ai-business-strategist` es el punto de captura de la intencion de Shadow Testing en la Fase 0 (Hard Rule #6), no el `ai-data-scientist` | La decision de hacer Shadow Testing es una decision de negocio (quien aprueba el paso a produccion, cual es el criterio de aceptacion del tratamiento). Si se captura en Fase de Descubrimiento, puede reflejarse en el BRD y en el behavior.md desde el inicio, evitando un CC costoso en fases posteriores. | La Hard Rule #6 del `ai-business-strategist` formaliza las preguntas obligatorias durante el ritual ask-me. El BRD puede incorporar una seccion de Estrategia de Despliegue con Shadow Testing si el cliente lo confirma en Flores_CD. |
+| **D-018** | El `feature-importance-analyzer` genera una tabla comparativa de rankings SHAP y Permutation Importance para ambos modelos, y emite una alerta para el Shadow Test cuando los patrones SHAP divergen significativamente | Una divergencia en importancia de features entre Control y Tratamiento indica que los modelos han aprendido señales distintas. Esto es informacion critica para el Product Owner antes de decidir la promocion del Tratamiento a Control. Sin esta alerta, el swap podria hacerse basandose solo en accuracy agregado, ocultando diferencias de comportamiento interno. | El `feature-importance-analyzer` produce un artefacto adicional de alerta de divergencia. El SAD (T0.10) debe incluir este artefacto como salida del pipeline de evaluacion. |
+
+---
+
+### Lecciones Aprendidas
+
+| # | Leccion | Contexto |
+| :--- | :--- | :--- |
+| **L-010** | El paradigma de Torneo de Algoritmos requiere que el Efficiency Gate preceda a cualquier evaluacion de precision. Evaluar precision de un modelo que no puede operar en el hardware objetivo es trabajo desperdiciado. La arquitectura de agentes debe reflejar este orden de filtros explicitamente. | Al disenar el `algorithm-architecture-evaluator`, el orden natural era evaluar precision primero y luego verificar recursos. Invertir este orden (Efficiency Gate primero) es contraintuitivo pero correcto: evita optimizar hiperparametros de candidatos que nunca llegaran a produccion. |
+| **L-011** | La captura temprana de la intencion de Shadow Testing en la Fase 0 es mas barata que un CC en la Fase de Modelado. Un requisito de Shadow Testing descubierto cuando ya existe un unico modelo entrenado obliga a redisenar la arquitectura de gestion de modelos y el esquema de persistencia. | La sesion anterior (CC-002) incorporo Shadow Testing al BRD despues de que ya estaba redactado. Aunque el CC fue exitoso, el costo hubiera sido mayor si se detectaba en la Fase de Ingesta o Modelado. La Hard Rule #6 previene que esto se repita en proyectos futuros. |
+| **L-012** | Los skills de un agente deben diferenciarse por el rol del artefacto que producen, no solo por la tecnica que aplican. SHAP se aplica igual a Control y a Tratamiento, pero el artefacto de salida (tabla comparativa + alerta de divergencia) tiene valor distinto para el Product Owner que SHAP de un modelo aislado. El diseño de skills debe explicitar este contexto de uso. | Al actualizar el `feature-importance-analyzer`, la primera version del skill simplemente doblaba el analisis SHAP. La version final agrega la tabla comparativa y la señal de alerta, que son los entregables con valor real para la decision de promocion de modelo. |
