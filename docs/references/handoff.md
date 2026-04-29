@@ -23,16 +23,15 @@
 | **BRD v1.6.0** | `docs/governance/BRD.md` — 7 micro-decisiones post-auditoria aplicadas; esquema SQLite expandido a 21 campos (`prediction_batch_id`); KPI-T-05 simplificado; dominio `estado` completo; RF-08 con distincion de modos de fallo | Completada |
 | **BRD v1.7.0** | `docs/governance/BRD.md` — segunda auditoria devil's advocate; 5 micro-decisiones (D-026 a D-030): filtrado tecnico de cola, label UI A2, flujo post-accion A2, prediction_batch_id sin par, CA-03/CA-04 con valores concretos | Completada |
 | **BRD v1.8.0** | `docs/governance/BRD.md` — tercera auditoria devil's advocate (perspectiva implementador Gherkin); 2 micro-decisiones (D-031, D-032): mock canonico CA-02a con mapping de clases, tabla de valores de especie_analista1 por camino del A1, CA-03 con decision del A1 fijada | Completada |
-| **behavior.md** | `docs/governance/behavior.md` — Contrato BDD redactado con 8 escenarios Gherkin; cubre US-01 a US-03, RF-08 (Shadow Testing) y RF-01a (Session State) | Completada |
+| **behavior.md** | `docs/governance/behavior.md` — Contrato BDD redactado con 8 escenarios Gherkin; cubre US-01 a US-03, RF-08 (Shadow Testing) y RF-01a (Session State). **Certificado con Matriz de DoD Integral (v1.2.0)**. | Completada |
 
 ### Detalle de la sesion
 
-**Contrato BDD (behavior.md):**
+**Contrato BDD y Auditoría DoD (behavior.md v1.2.0):**
 - Se han definido 8 escenarios Gherkin determinísticos que traducen el BRD v1.8.0 a especificaciones ejecutables.
-- Cobertura completa de la máquina de estados: 4 caminos para el Analista 1, 3 acciones para el Analista 2.
-- Escenario específico para Shadow Testing que verifica la creación del par de registros (control/shadow) con el mismo `prediction_batch_id`.
-- Escenario para RF-01a que garantiza el aislamiento del `analista_id` entre recargas de página, crítico para el despliegue en PC compartida.
-- Uso de mock canónico (D-031) para el test de CA-02a (baja confianza automática).
+- **Blindaje Devil's Advocate:** Se agregaron escenarios de resiliencia para fallos del Modelo Tratamiento (RF-08), validación estricta de rangos de input (RF-01b) y exclusión de auto-casos en la cola (D-026).
+- **Matriz de DoD Integral:** Se incorporó una matriz que vincula cada funcionalidad con su criterio de aceptación de negocio y su método de verificación técnica (Unit/E2E/Auditoría DB), asegurando que "todo tenga su DoD".
+- Cobertura completa de la máquina de estados: 4 caminos para el Analista 1, 3 acciones para el Analista 2 con navegación persistente en la cola.
 
 ---
 
@@ -42,7 +41,7 @@
 | :--- | :--- | :--- | :--- |
 | **T0.8** | Reporte de Factibilidad de Datos | `ai-data-auditor` | T0.4 resuelta |
 | **T0.9** | Construccion del Mockup Visual | `ai-ux-designer` | BRD v1.8.0 |
-| **T0.10** | Diseno de Arquitectura de Software (SAD) | `ai-solutions-architect` | T0.6 resuelta, T0.7 completada |
+| **T0.10** | Diseno de Arquitectura de Software (SAD) | `ai-solutions-architect` | T0.6 resuelta, T0.7 completada (v1.2.0 certified) |
 | **T0.11** | Especificacion de Interfaces (SpecDD) | `ai-solutions-architect` | T0.10 |
 | **T0.12** | Creacion del Contrato de Datos | `ai-solutions-architect` | T0.10 |
 
@@ -52,28 +51,17 @@
 
 ## Bloqueadores activos
 
-Ninguno. El BRD v1.5.0 esta aprobado y el escuadron de agentes esta alineado con el paradigma de Torneo + Shadow Testing.
+Ninguno. El BRD v1.8.0 y el behavior.md v1.2.0 están aprobados y certificados. El escuadrón de agentes está alineado.
 
 ---
 
 ## Contexto critico para retomar
 
-1. **BRD v1.8.0** (`docs/governance/BRD.md`) es la unica fuente de verdad vigente. Versiones anteriores quedan obsoletas.
-2. **Maquina de estados completa (5 transiciones):**
-   - Alta confianza + A1 acepta → `confirmada_a1` (caso cerrado, sin Analista 2)
-   - Baja confianza + cualquier decision A1 → `pendiente`
-   - Alta confianza + A1 rechaza → `pendiente`
-   - Analista 2 confirma → `confirmada`
-   - Analista 2 corrige → `corregida`
-3. **Shadow testing completamente invisible para los analistas.** Ambos modelos ejecutan en paralelo; solo el control es visible. El tratamiento tiene estado fijo `shadow`.
-4. **Esquema SQLite: 21 campos.** Los 3 campos de CC-003 (`decision_analista1`, `especie_analista1`, `timestamp_decision_analista1`) son nulos para registros shadow. El campo `prediction_batch_id` (UUID) es compartido entre el registro control y el shadow del mismo ciclo — es el mecanismo de join para KPI-T-05.
-5. **KPI-T-05:** Ground truth construido desde el veredicto final del flujo operativo, no desde etiquetas externas.
-6. **behavior.md debe cubrir 4 caminos para el mecanismo A1** ademas de escenarios de shadow testing. CA-02a y CA-02b del BRD siguen vigentes.
-7. **CA-02 dividida en CA-02a y CA-02b.** CA-02a usa mock de modelo con prob=[0.45, 0.30, 0.25] → activa advertencia de baja confianza. CA-02b es el test con input real post-entrenamiento.
-8. **Umbral de baja confianza 0.60:** calibrable post-entrenamiento. Criterio: ≤15% de predicciones del test set de Iris deben activar la advertencia.
-9. **Modelo Control = estabilidad (minimo CV std). Modelo Tratamiento = maxima precision.** El Efficiency Gate se aplica a todos los candidatos antes de evaluar precision.
-10. **El ai-business-strategist es el punto de captura de la intencion de Shadow Testing (Fase 0)**, no el ai-data-scientist. La Hard Rule #6 lo formaliza.
-11. El `config.md` es la fuente de verdad para IDs externos (NotebookLM ID: `7169f5cf-1c59-43ea-aa59-56d5e9f1dff3`, GitHub: `https://github.com/jdrodriguez1000/Flores_CD`).
+1. **BRD v1.8.0** (`docs/governance/BRD.md`) y **behavior.md v1.2.0** son las fuentes de verdad vigentes.
+2. **Matriz de DoD**: Consultar la sección final de `behavior.md` para los criterios de éxito técnicos de cada slice vertical.
+3. **Resiliencia Shadow**: El fallo del modelo tratamiento DEBE ser silencioso y no interrumpir el flujo del control.
+4. **Navegación A2**: Tras confirmar/corregir, el analista debe permanecer en la vista de cola (si hay más casos).
+5. **Aislamiento de Sesión**: `analista_id` es obligatorio y debe limpiarse en cada recarga de página (RF-01a).
 
 ---
 

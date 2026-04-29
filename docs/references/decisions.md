@@ -310,5 +310,33 @@
 | # | Leccion | Contexto |
 | :--- | :--- | :--- |
 | **L-018** | La redaccion de escenarios Gherkin es el "compilador" de la logica de negocio. Si un requerimiento del BRD es dificil de traducir a Given/When/Then, es porque la definicion de estados o transiciones aun es ambigua. | Al redactar el escenario de US-03 (Revision), la necesidad de distinguir los dos origenes del pendiente (`baja_confianza_automatica` vs `rechazo_analista1`) se volvio evidente para que el Analista 2 sepa que esta confirmando. |
-| **L-019** | El uso de "Antecedentes" (Background) en Gherkin para definir la presencia de ambos modelos (Control/Tratamiento) refuerza el paradigma de Shadow Testing en cada test, evitando que se olvide el registro shadow en los escenarios de exito del analista. | Sin el Background, los escenarios individuales podrian ignorar el registro shadow, resultando en tests que pasan pero que no verifican la integridad del batch de prediccion completo. |
+| L-019 | El uso de "Antecedentes" (Background) en Gherkin para definir la presencia de ambos modelos (Control/Tratamiento) refuerza el paradigma de Shadow Testing en cada test, evitando que se olvide el registro shadow en los escenarios de exito del analista. | Sin el Background, los escenarios individuales podrian ignorar el registro shadow, resultando en tests que pasan pero que no verifican la integridad del batch de prediccion completo. |
+
+---
+
+## [2026-04-29] — Certificación de Contrato BDD y Auditoría de DoD — T0.7 Finalizada
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documento afectado:** `docs/governance/behavior.md` (v1.1.0 → v1.2.0)
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-036** | Incorporación de Matriz de DoD Integral en `behavior.md` | Provee un puente directo entre los escenarios Gherkin y la validación técnica (Pytest/E2E/Auditoría DB), eliminando la ambigüedad sobre qué constituye un test exitoso. | El `ai-data-qa-engineer` tiene un roadmap de verificación determinístico. |
+| **D-037** | Escenario de Resiliencia de Shadow Testing agregado al BDD | El BRD exige que el fallo del shadow sea invisible. Sin un test BDD, la ingeniería podría ignorar la gestión de excepciones en el dispatcher, rompiendo la experiencia del usuario ante fallos internos. | El dispatcher debe implementarse con bloques try-except que no bloqueen el hilo principal del modelo control. |
+| **D-038** | Clarificación del selector "Corregir" para el Analista 2: muestra las 3 especies sin filtros | Permite resolver el caso donde el Analista 1 se equivocó al rechazar el modelo y el Analista 2 desea restaurar la predicción original del modelo. | Evita bloqueos en el flujo operativo ante discrepancias humano-humano. |
+
+---
+
+### Lecciones Aprendidas
+
+| # | Leccion | Contexto |
+| :--- | :--- | :--- |
+| **L-020** | Un BDD contract sin una matriz de DoD técnica es solo una especificación funcional. Para que sea un "Contrato de Ingeniería", debe explicitar la técnica de verificación (E2E vs Unit vs Auditoría DB) para cada comportamiento. | La auditoría devil's advocate detectó que los escenarios Gherkin eran correctos pero "inverificables" automáticamente sin definir el método (ej: inyección de fallos para resiliencia). |
+| **L-021** | La "invisibilidad" de una característica (como el shadow testing) es una de las tareas más difíciles de testear. Requiere tests negativos y auditorías de base de datos para asegurar que lo "invisible" realmente ocurrió en el backend sin dejar rastro en el frontend. | D-037 y su DoD asociado obligan a verificar la ausencia de alertas en la UI ante fallos del modelo tratamiento. |
+
 
