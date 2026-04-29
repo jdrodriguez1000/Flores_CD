@@ -339,4 +339,26 @@
 | **L-020** | Un BDD contract sin una matriz de DoD técnica es solo una especificación funcional. Para que sea un "Contrato de Ingeniería", debe explicitar la técnica de verificación (E2E vs Unit vs Auditoría DB) para cada comportamiento. | La auditoría devil's advocate detectó que los escenarios Gherkin eran correctos pero "inverificables" automáticamente sin definir el método (ej: inyección de fallos para resiliencia). |
 | **L-021** | La "invisibilidad" de una característica (como el shadow testing) es una de las tareas más difíciles de testear. Requiere tests negativos y auditorías de base de datos para asegurar que lo "invisible" realmente ocurrió en el backend sin dejar rastro en el frontend. | D-037 y su DoD asociado obligan a verificar la ausencia de alertas en la UI ante fallos del modelo tratamiento. |
 
+---
+
+## [2026-04-29] — Auditoría Final Devil's Advocate (v1.2.0 → v1.3.0) — T0.7 Cerrada
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documento afectado:** `docs/governance/behavior.md` (v1.2.0 → v1.3.0)
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-039** | Inclusión de 4 escenarios críticos de "borde lógico" en el BDD contract (v1.3.0): Rechazo+Baja Confianza, Labels Dinámicos A2, Inputs Vacíos, y Tratamiento No Configurado. | Garantizan que el sistema no se rompa bajo uso real (ej. inputs vacíos o sin modelo tratamiento) y validan interacciones sutiles pero críticas exigidas por el BRD (ej. doble trigger y UX del Analista 2). | Cierra la brecha entre el BRD y los tests de aceptación. La Matriz de DoD se expandió a 13 criterios técnicos. |
+
+### Lecciones Aprendidas
+
+| # | Leccion | Contexto |
+| :--- | :--- | :--- |
+| **L-022** | Una especificación BDD que prueba las acciones combinadas (ej. "Corregir/Confirmar") suele perder aserciones UI específicas (ej. el texto exacto del botón). Separar los "Renderizados UI" de las "Acciones de Estado" en escenarios distintos previene esta pérdida de fidelidad al BRD. | En v1.2.0, el escenario de acción de A2 olvidó testear los textos dinámicos del botón. Se corrigió en v1.3.0 separando el renderizado de la acción. |
+
 

@@ -23,14 +23,15 @@
 | **BRD v1.6.0** | `docs/governance/BRD.md` — 7 micro-decisiones post-auditoria aplicadas; esquema SQLite expandido a 21 campos (`prediction_batch_id`); KPI-T-05 simplificado; dominio `estado` completo; RF-08 con distincion de modos de fallo | Completada |
 | **BRD v1.7.0** | `docs/governance/BRD.md` — segunda auditoria devil's advocate; 5 micro-decisiones (D-026 a D-030): filtrado tecnico de cola, label UI A2, flujo post-accion A2, prediction_batch_id sin par, CA-03/CA-04 con valores concretos | Completada |
 | **BRD v1.8.0** | `docs/governance/BRD.md` — tercera auditoria devil's advocate (perspectiva implementador Gherkin); 2 micro-decisiones (D-031, D-032): mock canonico CA-02a con mapping de clases, tabla de valores de especie_analista1 por camino del A1, CA-03 con decision del A1 fijada | Completada |
-| **behavior.md** | `docs/governance/behavior.md` — Contrato BDD redactado con 8 escenarios Gherkin; cubre US-01 a US-03, RF-08 (Shadow Testing) y RF-01a (Session State). **Certificado con Matriz de DoD Integral (v1.2.0)**. | Completada |
+| **behavior.md** | `docs/governance/behavior.md` — Contrato BDD redactado con 13 escenarios Gherkin; cubre US-01 a US-03, RF-08 (Shadow Testing) y RF-01a (Session State). **Certificado con Matriz de DoD Integral (v1.3.0)**. | Completada |
 
 ### Detalle de la sesion
 
-**Contrato BDD y Auditoría DoD (behavior.md v1.2.0):**
-- Se han definido 8 escenarios Gherkin determinísticos que traducen el BRD v1.8.0 a especificaciones ejecutables.
+**Contrato BDD y Auditoría DoD (behavior.md v1.3.0):**
+- Se han definido 13 escenarios Gherkin determinísticos que traducen el BRD v1.8.0 a especificaciones ejecutables.
+- **Auditoría Final Devil's Advocate:** Se inyectaron 4 escenarios críticos de "borde lógico": Rechazo+Baja Confianza (Doble Trigger), Labels Dinámicos A2, Inputs Vacíos, y Tratamiento No Configurado.
 - **Blindaje Devil's Advocate:** Se agregaron escenarios de resiliencia para fallos del Modelo Tratamiento (RF-08), validación estricta de rangos de input (RF-01b) y exclusión de auto-casos en la cola (D-026).
-- **Matriz de DoD Integral:** Se incorporó una matriz que vincula cada funcionalidad con su criterio de aceptación de negocio y su método de verificación técnica (Unit/E2E/Auditoría DB), asegurando que "todo tenga su DoD".
+- **Matriz de DoD Integral:** Se incorporó una matriz de 13 criterios que vincula cada funcionalidad con su criterio de aceptación de negocio y su método de verificación técnica (Unit/E2E/Auditoría DB), asegurando que "todo tenga su DoD".
 - Cobertura completa de la máquina de estados: 4 caminos para el Analista 1, 3 acciones para el Analista 2 con navegación persistente en la cola.
 
 ---
@@ -41,7 +42,7 @@
 | :--- | :--- | :--- | :--- |
 | **T0.8** | Reporte de Factibilidad de Datos | `ai-data-auditor` | T0.4 resuelta |
 | **T0.9** | Construccion del Mockup Visual | `ai-ux-designer` | BRD v1.8.0 |
-| **T0.10** | Diseno de Arquitectura de Software (SAD) | `ai-solutions-architect` | T0.6 resuelta, T0.7 completada (v1.2.0 certified) |
+| **T0.10** | Diseno de Arquitectura de Software (SAD) | `ai-solutions-architect` | T0.6 resuelta, T0.7 completada (v1.3.0 certified) |
 | **T0.11** | Especificacion de Interfaces (SpecDD) | `ai-solutions-architect` | T0.10 |
 | **T0.12** | Creacion del Contrato de Datos | `ai-solutions-architect` | T0.10 |
 
@@ -51,16 +52,16 @@
 
 ## Bloqueadores activos
 
-Ninguno. El BRD v1.8.0 y el behavior.md v1.2.0 están aprobados y certificados. El escuadrón de agentes está alineado.
+Ninguno. El BRD v1.8.0 y el behavior.md v1.3.0 están aprobados y certificados. El escuadrón de agentes está alineado.
 
 ---
 
 ## Contexto critico para retomar
 
-1. **BRD v1.8.0** (`docs/governance/BRD.md`) y **behavior.md v1.2.0** son las fuentes de verdad vigentes.
-2. **Matriz de DoD**: Consultar la sección final de `behavior.md` para los criterios de éxito técnicos de cada slice vertical.
-3. **Resiliencia Shadow**: El fallo del modelo tratamiento DEBE ser silencioso y no interrumpir el flujo del control.
-4. **Navegación A2**: Tras confirmar/corregir, el analista debe permanecer en la vista de cola (si hay más casos).
+1. **BRD v1.8.0** (`docs/governance/BRD.md`) y **behavior.md v1.3.0** son las fuentes de verdad vigentes.
+2. **Matriz de DoD**: Consultar la sección final de `behavior.md` para los 13 criterios de éxito técnicos de cada slice vertical.
+3. **Resiliencia Shadow**: El fallo del modelo tratamiento DEBE ser silencioso y no interrumpir el flujo del control. La ausencia del modelo (no configurado) también debe permitir la operación normal del Control.
+4. **Navegación A2**: Tras confirmar/corregir, el analista debe permanecer en la vista de cola (si hay más casos). Los botones deben tener texto dinámico ("Confirmar especie del modelo" vs "Analista 1").
 5. **Aislamiento de Sesión**: `analista_id` es obligatorio y debe limpiarse en cada recarga de página (RF-01a).
 
 ---
