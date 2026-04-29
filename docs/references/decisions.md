@@ -283,4 +283,32 @@
 
 | # | Leccion | Contexto |
 | :--- | :--- | :--- |
-| **L-017** | Una tercera ronda de auditoria del BRD, ejecutada con ojo de implementador de tests Gherkin, detecta vacios de contrato de datos que las auditorias previas no ven: especificamente, la ausencia de mapping entre vectores de probabilidad y nombres de clase, y la ausencia de valores NULL vs. vacio en columnas opcionales. Estos vacios son invisibles desde la perspectiva de negocio pero bloquean la escritura de steps `Entonces` deterministas. | Los hallazgos A3-H01 y A3-H02 son de naturaleza tecnica (contrato de columna SQLite, orden canonico de clases), no de negocio. Solo emergen cuando se intenta traducir el BRD a un escenario Gherkin con valores concretos en todos los pasos. La auditoria con perspectiva de implementador de tests es complementaria a la auditoria de consistencia logica y a la auditoria de UX/flujo. |
+| L-017 | Una tercera ronda de auditoria del BRD, ejecutada con ojo de implementador de tests Gherkin, detecta vacios de contrato de datos que las auditorias previas no ven: especificamente, la ausencia de mapping entre vectores de probabilidad y nombres de clase, y la ausencia de valores NULL vs. vacio en columnas opcionales. Estos vacios son invisibles desde la perspectiva de negocio pero bloquean la escritura de steps `Entonces` deterministas. | Los hallazgos A3-H01 y A3-H02 son de naturaleza tecnica (contrato de columna SQLite, orden canonico de clases), no de negocio. Solo emergen cuando se intenta traducir el BRD a un escenario Gherkin con valores concretos en todos los pasos. La auditoria con perspectiva de implementador de tests es complementaria a la auditoria de consistencia logica y a la auditoria de UX/flujo. |
+
+---
+
+## [2026-04-29] — Creacion del Contrato BDD (behavior.md) — T0.7
+
+- **Rama:** `slice/F0-backlog-init`
+- **Agente:** `ai-business-strategist`
+- **Documento afectado:** `docs/governance/behavior.md`
+
+---
+
+### Decisiones
+
+| ID | Decision | Justificacion | Impacto |
+| :--- | :--- | :--- | :--- |
+| **D-033** | Definicion de 8 escenarios Gherkin canonicos que cubren el 100% de los requerimientos funcionales criticos (US-01, US-02, US-03, RF-08, RF-01a) | Garantiza que el desarrollo en Phase Engineering tenga una guia de aceptacion deterministica. Los escenarios cubren los caminos de exito, de error y de flujo operativo (revisores). | El `ai-data-qa-engineer` debe implementar tests automatizados basados exactamente en estos escenarios. Define el DoD funcional del sistema. |
+| **D-034** | Inclusion del escenario `RF-01a — Aislamiento de Session State` como prueba de comportamiento bloqueante | El despliegue en PC compartida hace que este requerimiento no funcional sea critico para la seguridad operativa. Incluirlo en el BDD contract asegura que se testee explicitamente la limpieza del `analista_id`. | El desarrollador del dashboard Streamlit debe asegurar que el estado no persiste entre recargas. |
+| **D-035** | Uso de tablas Gherkin para mapear campos de SQLite directamente en los steps `Entonces` | Facilita la trazabilidad entre el comportamiento observado en la UI y la persistencia en la capa de datos (SQLite). | Los tests de aceptacion deben verificar no solo la UI sino tambien el estado final de la base de datos. |
+
+---
+
+### Lecciones Aprendidas
+
+| # | Leccion | Contexto |
+| :--- | :--- | :--- |
+| **L-018** | La redaccion de escenarios Gherkin es el "compilador" de la logica de negocio. Si un requerimiento del BRD es dificil de traducir a Given/When/Then, es porque la definicion de estados o transiciones aun es ambigua. | Al redactar el escenario de US-03 (Revision), la necesidad de distinguir los dos origenes del pendiente (`baja_confianza_automatica` vs `rechazo_analista1`) se volvio evidente para que el Analista 2 sepa que esta confirmando. |
+| **L-019** | El uso de "Antecedentes" (Background) en Gherkin para definir la presencia de ambos modelos (Control/Tratamiento) refuerza el paradigma de Shadow Testing en cada test, evitando que se olvide el registro shadow en los escenarios de exito del analista. | Sin el Background, los escenarios individuales podrian ignorar el registro shadow, resultando en tests que pasan pero que no verifican la integridad del batch de prediccion completo. |
+

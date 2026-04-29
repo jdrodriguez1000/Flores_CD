@@ -23,22 +23,16 @@
 | **BRD v1.6.0** | `docs/governance/BRD.md` — 7 micro-decisiones post-auditoria aplicadas; esquema SQLite expandido a 21 campos (`prediction_batch_id`); KPI-T-05 simplificado; dominio `estado` completo; RF-08 con distincion de modos de fallo | Completada |
 | **BRD v1.7.0** | `docs/governance/BRD.md` — segunda auditoria devil's advocate; 5 micro-decisiones (D-026 a D-030): filtrado tecnico de cola, label UI A2, flujo post-accion A2, prediction_batch_id sin par, CA-03/CA-04 con valores concretos | Completada |
 | **BRD v1.8.0** | `docs/governance/BRD.md` — tercera auditoria devil's advocate (perspectiva implementador Gherkin); 2 micro-decisiones (D-031, D-032): mock canonico CA-02a con mapping de clases, tabla de valores de especie_analista1 por camino del A1, CA-03 con decision del A1 fijada | Completada |
+| **behavior.md** | `docs/governance/behavior.md` — Contrato BDD redactado con 8 escenarios Gherkin; cubre US-01 a US-03, RF-08 (Shadow Testing) y RF-01a (Session State) | Completada |
 
 ### Detalle de la sesion
 
-**Paradigma de Torneo de Algoritmos:**
-- El escuadrón de agentes ahora soporta el flujo completo: Torneo → Filtro de Eficiencia → Seleccion Dual (Control/Tratamiento) → Shadow Test.
-- El Modelo Control se selecciona por estabilidad (minimo CV std). El Modelo Tratamiento se selecciona por maxima precision, con el Efficiency Gate como filtro previo no negociable.
-- El artefacto de salida del torneo es un YAML con `control_model` y `treatment_model` como campos diferenciados.
-
-**Efficiency Gate:**
-- Candidatos al torneo son eliminados ANTES de evaluar precision si superan los limites de train time, latencia de inferencia o uso de memoria.
-- Este filtro hace al sistema compatible con el hardware del cliente (Streamlit local, PC compartida).
-
-**Rol del ai-business-strategist en Shadow Testing:**
-- La Hard Rule #6 obliga al estratega a preguntar explicitamente sobre Shadow Testing durante el ritual ask-me de la Fase 0.
-- Las preguntas de seguimiento cubren: quien aprueba el paso a produccion y cuales son los criterios de aceptacion del tratamiento.
-- Esto centraliza la captura de la intencion de Shadow Testing en la Fase de Descubrimiento, evitando que se descubra tardıamente como un requisito no documentado.
+**Contrato BDD (behavior.md):**
+- Se han definido 8 escenarios Gherkin determinísticos que traducen el BRD v1.8.0 a especificaciones ejecutables.
+- Cobertura completa de la máquina de estados: 4 caminos para el Analista 1, 3 acciones para el Analista 2.
+- Escenario específico para Shadow Testing que verifica la creación del par de registros (control/shadow) con el mismo `prediction_batch_id`.
+- Escenario para RF-01a que garantiza el aislamiento del `analista_id` entre recargas de página, crítico para el despliegue en PC compartida.
+- Uso de mock canónico (D-031) para el test de CA-02a (baja confianza automática).
 
 ---
 
@@ -46,18 +40,13 @@
 
 | ID | Tarea | Agente Responsable | Dependencia |
 | :--- | :--- | :--- | :--- |
-| **T0.7** | Redactar `docs/governance/behavior.md` (BDD Contract / escenarios Gherkin) | `ai-business-strategist` (skill: `gherkin-scenario-author`) | BRD v1.5.0 aprobado |
 | **T0.8** | Reporte de Factibilidad de Datos | `ai-data-auditor` | T0.4 resuelta |
-| **T0.9** | Construccion del Mockup Visual | `ai-ux-designer` | BRD v1.5.0 |
-| **T0.10** | Diseno de Arquitectura de Software (SAD) | `ai-solutions-architect` | T0.6 resuelta, T0.7 |
+| **T0.9** | Construccion del Mockup Visual | `ai-ux-designer` | BRD v1.8.0 |
+| **T0.10** | Diseno de Arquitectura de Software (SAD) | `ai-solutions-architect` | T0.6 resuelta, T0.7 completada |
 | **T0.11** | Especificacion de Interfaces (SpecDD) | `ai-solutions-architect` | T0.10 |
 | **T0.12** | Creacion del Contrato de Datos | `ai-solutions-architect` | T0.10 |
-| **Pendiente opcional** | Ajustar `docs/Phase_discovery/BRD.md` para incorporar seccion de Estrategia de Despliegue con Shadow Testing si aplica al proyecto Flores_CD | `ai-business-strategist` | BRD v1.5.0, decision del cliente |
 
-**Tarea #1 para la proxima sesion:** T0.7 — Redactar `docs/governance/behavior.md`. El agente `ai-business-strategist` debe usar el BRD v1.8.0 como unica fuente de verdad y cubrir los siguientes caminos:
-- 4 caminos para el mecanismo Aceptar/Rechazar del Analista 1: alta confianza + acepta, alta confianza + rechaza, baja confianza + acepta, baja confianza + rechaza.
-- Escenarios de shadow testing: ejecucion invisible del modelo tratamiento, almacenamiento con `is_shadow=True`, ausencia de exposicion al analista.
-- CA-02a y CA-02b del BRD siguen vigentes (CA-02a testeable con mock; CA-02b requiere modelo entrenado, se redacta como placeholder).
+**Tarea #1 para la proxima sesion:** T0.8 — Reporte de Factibilidad de Datos por el `ai-data-auditor`.
 
 ---
 
